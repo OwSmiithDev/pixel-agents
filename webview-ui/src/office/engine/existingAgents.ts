@@ -16,6 +16,7 @@ export interface ExistingAgentMeta {
   palette?: number;
   hueShift?: number;
   seatId?: string;
+  restSeatId?: string;
 }
 
 /** An agent buffered until the layout (and its seats) has been built. */
@@ -24,6 +25,7 @@ export interface PendingAgent {
   palette?: number;
   hueShift?: number;
   seatId?: string;
+  restSeatId?: string;
   folderName?: string;
   isHeadless?: boolean;
 }
@@ -38,6 +40,8 @@ export interface ExistingAgentsOffice {
     preferredSeatId?: string,
     skipSpawnEffect?: boolean,
     folderName?: string,
+    nearAgentId?: number,
+    preferredRestSeatId?: string,
   ) => void;
   setHeadless: (id: number, headless: boolean) => void;
 }
@@ -66,12 +70,22 @@ export function reconcileExistingAgents(
       palette: m?.palette,
       hueShift: m?.hueShift,
       seatId: m?.seatId,
+      restSeatId: m?.restSeatId,
       folderName: folderNames[id],
       isHeadless: headlessAgents[id] === true,
     };
     if (layoutReady) {
       if (!os.characters.has(p.id)) {
-        os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true, p.folderName);
+        os.addAgent(
+          p.id,
+          p.palette,
+          p.hueShift,
+          p.seatId,
+          true,
+          p.folderName,
+          undefined,
+          p.restSeatId,
+        );
         if (p.isHeadless) os.setHeadless(p.id, true);
         addedDirectly = true;
       }

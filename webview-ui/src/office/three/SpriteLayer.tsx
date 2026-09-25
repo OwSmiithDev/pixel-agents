@@ -94,7 +94,7 @@ function collectDrawables(officeState: OfficeState, walls: FurnitureInstance[]):
     const sprite = getCharacterSprite(ch, getCharacterSprites(ch.palette, ch.hueShift));
     const w = sprite[0].length;
     const h = sprite.length;
-    const sitting = ch.state === CharacterState.TYPE;
+    const sitting = ch.state === CharacterState.TYPE || ch.state === CharacterState.REST;
     const emissive =
       ch.id === officeState.selectedAgentId
         ? THREE_SELECTED_EMISSIVE

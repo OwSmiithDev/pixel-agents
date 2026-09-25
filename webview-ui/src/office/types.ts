@@ -30,6 +30,8 @@ export const CharacterState = {
   IDLE: 'idle',
   WALK: 'walk',
   TYPE: 'type',
+  /** Seated idle (turn over): sitting pose, static frame, at the rest seat or the PC. */
+  REST: 'rest',
 } as const;
 export type CharacterState = (typeof CharacterState)[keyof typeof CharacterState];
 
@@ -190,16 +192,12 @@ export interface Character {
   frame: number;
   /** Time accumulator for animation */
   frameTimer: number;
-  /** Timer for idle wander decisions */
-  wanderTimer: number;
-  /** Number of wander moves completed in current roaming cycle */
-  wanderCount: number;
-  /** Max wander moves before returning to seat for rest */
-  wanderLimit: number;
   /** Whether the agent is actively working */
   isActive: boolean;
-  /** Assigned seat uid, or null if no seat */
+  /** Work seat uid (a seat facing a PC), or null if no seat */
   seatId: string | null;
+  /** Rest seat uid (lounge seat used between turns), or null. Sub-agents never have one. */
+  restSeatId: string | null;
   /** Active speech bubble type, or null if none showing */
   bubbleType: 'permission' | 'waiting' | null;
   /** Only meaningful while bubbleType === 'waiting': true when the agent went
@@ -209,7 +207,7 @@ export interface Character {
   waitingAwaitingInput?: boolean;
   /** Countdown timer for bubble (waiting: 2→0, permission: unused) */
   bubbleTimer: number;
-  /** Timer to stay seated while inactive after seat reassignment (counts down to 0) */
+  /** While inactive and seated at the PC: seconds left before leaving for the rest seat */
   seatTimer: number;
   /** Whether this character represents a sub-agent (spawned by Task tool) */
   isSubagent: boolean;

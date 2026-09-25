@@ -9,11 +9,14 @@ import {
   FURNITURE_ANIM_INTERVAL_SEC,
   GREETER_ID,
   GREETER_TILE_MARGIN,
+  IDE_AREA_LABEL,
   INACTIVE_SEAT_TIMER_MIN_SEC,
   INACTIVE_SEAT_TIMER_RANGE_SEC,
   MAX_PET_ID_LENGTH,
   PET_HIT_HALF_WIDTH,
   PET_HIT_HEIGHT,
+  REST_AREA_LABELS,
+  REST_DELAY_SEC,
   WAITING_BUBBLE_DURATION_SEC,
 } from '../../constants.js';
 import { getAnimationFrames, getCatalogEntry, getOnStateType } from '../layout/furnitureCatalog.js';
@@ -38,10 +41,43 @@ import type {
   TileType as TileTypeVal,
 } from '../types.js';
 import { CharacterState, Direction, PetState, TILE_SIZE } from '../types.js';
-import { createCharacter, updateCharacter } from './characters.js';
+import { createCharacter, sit, updateCharacter, walkTo } from './characters.js';
 import { advanceMatrixEffect, startMatrixEffect } from './matrixEffectState.js';
 import { createPet, updatePet } from './petEntity.js';
 import { anchorTile, closestFreeSeat } from './seatPlacement.js';
+
+/** An agent (or sub-agent) waiting for a free work seat. No character exists for it. */
+interface OverflowEntry {
+  id: number;
+  palette: number;
+  hueShift: number;
+  folderName?: string;
+  preferredSeatId?: string;
+  preferredRestSeatId?: string;
+  nearAgentId?: number;
+  /** Set for sub-agents */
+  parentAgentId?: number;
+  isActive: boolean;
+  isHeadless: boolean;
+}
+
+/** One agent's entry in the `saveAgentSeats` payload. */
+export interface PersistedSeat {
+  palette: number;
+  hueShift: number;
+  seatId: string | null;
+  restSeatId: string | null;
+}
+
+/** Options for findFreeWorkSeat. */
+export interface WorkSeatQuery {
+  /** Bias toward seats in the Areas mapped to this workspace folder */
+  folderName?: string;
+  /** Pick the free work seat closest to this tile */
+  near?: { col: number; row: number };
+  /** Allow seats inside an area labeled IDE (reserved for the IDE role) */
+  allowIde?: boolean;
+}
 
 /** Internal helper: facing-tile coords for a seat. Returns null for invalid direction. */
 function seatFacingOffset(direction: Direction): { dCol: number; dRow: number } {
@@ -71,6 +107,10 @@ export class OfficeState {
   /** Reverse lookup: sub-agent character ID → parent info */
   subagentMeta: Map<number, { parentAgentId: number; parentToolId: string }> = new Map();
   private nextSubagentId = -1;
+  /** Agents with no free work seat, oldest first (promoted when a work seat frees). */
+  private overflow: OverflowEntry[] = [];
+  /** Seats facing electronics. Every other seat is a rest seat. */
+  private workSeatIds = new Set<string>();
 
   /**
    * folderName → list of Area labels that workspace folder belongs to.
@@ -112,6 +152,7 @@ export class OfficeState {
     this.blockedTiles = getBlockedTiles(this.layout.furniture);
     this.furniture = layoutToFurnitureInstances(this.layout.furniture);
     this.walkableTiles = getWalkableTiles(this.tileMap, this.blockedTiles);
+    this.classifySeats();
     // Pets are built last because they need walkableTiles populated for spawn.
     this.rebuildPetsFromLayout(this.layout);
   }
@@ -125,6 +166,7 @@ export class OfficeState {
     this.blockedTiles = getBlockedTiles(layout.furniture);
     this.rebuildFurnitureInstances();
     this.walkableTiles = getWalkableTiles(this.tileMap, this.blockedTiles);
+    this.classifySeats();
 
     // Shift character positions when grid expands left/up
     if (shift && (shift.col !== 0 || shift.row !== 0)) {
@@ -156,54 +198,50 @@ export class OfficeState {
       seat.assigned = false;
     }
 
-    // First pass: try to keep characters at their existing seats
+    // First pass: keep seats that still exist, are free, and kept their work/rest role
     for (const ch of this.characters.values()) {
-      if (ch.seatId && this.seats.has(ch.seatId)) {
-        const seat = this.seats.get(ch.seatId)!;
-        if (!seat.assigned) {
-          seat.assigned = true;
-          // Snap character to seat position
-          ch.tileCol = seat.seatCol;
-          ch.tileRow = seat.seatRow;
-          const cx = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
-          const cy = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
-          ch.x = cx;
-          ch.y = cy;
-          ch.dir = seat.facingDir;
+      ch.seatId = this.claimSeat(ch.seatId, true);
+      ch.restSeatId = this.claimSeat(ch.restSeatId, false);
+    }
+
+    // Second pass: re-seat the rest. No work seat left → back to the overflow list.
+    for (const ch of [...this.characters.values()]) {
+      if (!ch.seatId) {
+        const near =
+          ch.parentAgentId !== null
+            ? anchorTile(this.characters.get(ch.parentAgentId), this.seats)
+            : undefined;
+        ch.seatId = this.claimSeat(
+          this.findFreeWorkSeat(near ? { near } : { folderName: ch.folderName }),
+          true,
+        );
+      }
+      if (!ch.seatId) {
+        this.characters.delete(ch.id);
+        if (ch.matrixEffect !== 'despawn') this.overflow.push(this.overflowEntryOf(ch));
+        continue;
+      }
+      if (!ch.restSeatId && !ch.isSubagent) this.assignRestSeat(ch);
+      // Editor rebuilds happen on every edit: leave a character seated on its own
+      // seat alone, and re-route one standing/walking on the floor.
+      const seated = ch.state === CharacterState.TYPE || ch.state === CharacterState.REST;
+      if (seated && this.ownSeatKeys(ch).includes(`${ch.tileCol},${ch.tileRow}`)) continue;
+      if (!seated && isWalkable(ch.tileCol, ch.tileRow, this.tileMap, this.blockedTiles)) {
+        const target = this.seats.get((ch.isActive ? null : ch.restSeatId) ?? ch.seatId)!;
+        if (
+          this.withOwnSeatUnblocked(ch, () => walkTo(ch, target, this.tileMap, this.blockedTiles))
+        )
           continue;
-        }
       }
-      ch.seatId = null; // will be reassigned below
+      // Otherwise snap to the work seat; an inactive agent heads to its rest seat from there
+      const seat = this.seats.get(ch.seatId)!;
+      ch.tileCol = seat.seatCol;
+      ch.tileRow = seat.seatRow;
+      ch.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
+      ch.y = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
+      sit(ch, CharacterState.TYPE, seat.facingDir);
     }
-
-    // Second pass: assign remaining characters to free seats
-    for (const ch of this.characters.values()) {
-      if (ch.seatId) continue;
-      const seatId = this.findFreeSeat(ch.folderName);
-      if (seatId) {
-        this.seats.get(seatId)!.assigned = true;
-        ch.seatId = seatId;
-        const seat = this.seats.get(seatId)!;
-        ch.tileCol = seat.seatCol;
-        ch.tileRow = seat.seatRow;
-        ch.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
-        ch.y = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
-        ch.dir = seat.facingDir;
-      }
-    }
-
-    // Relocate any characters that ended up outside bounds or on non-walkable tiles
-    for (const ch of this.characters.values()) {
-      if (ch.seatId) continue; // seated characters are fine
-      if (
-        ch.tileCol < 0 ||
-        ch.tileCol >= layout.cols ||
-        ch.tileRow < 0 ||
-        ch.tileRow >= layout.rows
-      ) {
-        this.relocateCharacterToWalkable(ch);
-      }
-    }
+    this.promoteOverflow();
 
     // Relocate any pets that ended up outside bounds or on non-walkable tiles
     for (const pet of this.pets) {
@@ -234,37 +272,108 @@ export class OfficeState {
     this.rebuildPetsFromLayout(layout);
   }
 
-  /** Move a character to a random walkable tile */
-  private relocateCharacterToWalkable(ch: Character): void {
-    if (this.walkableTiles.length === 0) return;
-    const spawn = this.walkableTiles[Math.floor(Math.random() * this.walkableTiles.length)];
-    ch.tileCol = spawn.col;
-    ch.tileRow = spawn.row;
-    ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2;
-    ch.y = spawn.row * TILE_SIZE + TILE_SIZE / 2;
-    ch.path = [];
-    ch.moveProgress = 0;
-  }
-
   getLayout(): OfficeLayout {
     return this.layout;
   }
 
-  /** Get the blocked-tile key for a character's own seat, or null */
-  private ownSeatKey(ch: Character): string | null {
-    if (!ch.seatId) return null;
-    const seat = this.seats.get(ch.seatId);
-    if (!seat) return null;
-    return `${seat.seatCol},${seat.seatRow}`;
+  /** Blocked-tile keys of a character's own seats (work + rest) */
+  private ownSeatKeys(ch: Character): string[] {
+    const keys: string[] = [];
+    for (const uid of [ch.seatId, ch.restSeatId]) {
+      const seat = uid ? this.seats.get(uid) : undefined;
+      if (seat) keys.push(`${seat.seatCol},${seat.seatRow}`);
+    }
+    return keys;
   }
 
-  /** Temporarily unblock a character's own seat, run fn, then re-block */
+  /** Temporarily unblock a character's own seats (work + rest), run fn, then re-block.
+   *  Every other seat stays blocked. */
   private withOwnSeatUnblocked<T>(ch: Character, fn: () => T): T {
-    const key = this.ownSeatKey(ch);
-    if (key) this.blockedTiles.delete(key);
-    const result = fn();
-    if (key) this.blockedTiles.add(key);
-    return result;
+    const keys = this.ownSeatKeys(ch).filter((k) => this.blockedTiles.delete(k));
+    try {
+      return fn();
+    } finally {
+      for (const k of keys) this.blockedTiles.add(k);
+    }
+  }
+
+  /** Recompute which seats are work seats (face electronics). */
+  private classifySeats(): void {
+    const electronics = this.buildElectronicsTileSet();
+    this.workSeatIds = new Set(
+      [...this.seats.values()]
+        .filter((s) => this.isSeatFacingElectronics(s, electronics))
+        .map((s) => s.uid),
+    );
+  }
+
+  /** Work seat = a seat facing electronics (PC, monitor). Every other seat is a rest seat. */
+  isWorkSeat(uid: string): boolean {
+    return this.workSeatIds.has(uid);
+  }
+
+  private seatInArea(uid: string, labels: string[]): boolean {
+    const zone = this.seatZone(uid);
+    return zone !== null && labels.includes(zone.toLowerCase());
+  }
+
+  /** Mark `uid` assigned and return it when it exists, is free and has the wanted
+   *  role (work or rest); otherwise null. */
+  private claimSeat(uid: string | null | undefined, work: boolean): string | null {
+    const seat = uid ? this.seats.get(uid) : undefined;
+    if (!seat || seat.assigned || this.isWorkSeat(seat.uid) !== work) return null;
+    seat.assigned = true;
+    return seat.uid;
+  }
+
+  /**
+   * Free work seat for an agent, or null. Seats in an `IDE` area are skipped
+   * unless `allowIde` (the IDE role hook). With `near`, the closest seat wins;
+   * otherwise the 3-stage folder/Area picker (mapped Areas → unzoned → any).
+   */
+  findFreeWorkSeat(opts: WorkSeatQuery = {}): string | null {
+    const free = [...this.workSeatIds].filter(
+      (uid) =>
+        !this.seats.get(uid)!.assigned &&
+        (opts.allowIde || !this.seatInArea(uid, [IDE_AREA_LABEL])),
+    );
+    if (free.length === 0) return null;
+    if (opts.near) return this.closestOf(free, opts.near);
+
+    const pick = (uids: string[]) =>
+      uids.length > 0 ? uids[Math.floor(Math.random() * uids.length)] : null;
+    const areaLabels = opts.folderName ? this.areaMappings[opts.folderName] : undefined;
+    if (areaLabels && areaLabels.length > 0) {
+      const wanted = new Set(areaLabels);
+      const inArea = pick(free.filter((uid) => wanted.has(this.seatZone(uid) ?? '')));
+      if (inArea) return inArea;
+    }
+    return pick(free.filter((uid) => this.seatZone(uid) === null)) ?? pick(free);
+  }
+
+  /** Free rest seat closest to `near`, preferring Descanso/Lounge/Rest areas; IDE area skipped. */
+  private findFreeRestSeat(near: { col: number; row: number }): string | null {
+    const free = [...this.seats.values()]
+      .filter(
+        (s) => !s.assigned && !this.isWorkSeat(s.uid) && !this.seatInArea(s.uid, [IDE_AREA_LABEL]),
+      )
+      .map((s) => s.uid);
+    const preferred = free.filter((uid) => this.seatInArea(uid, REST_AREA_LABELS));
+    return this.closestOf(preferred.length > 0 ? preferred : free, near);
+  }
+
+  private closestOf(uids: string[], near: { col: number; row: number }): string | null {
+    return closestFreeSeat(
+      new Map(uids.map((uid) => [uid, this.seats.get(uid)!])),
+      near.col,
+      near.row,
+    );
+  }
+
+  private assignRestSeat(ch: Character, preferred?: string): void {
+    ch.restSeatId =
+      this.claimSeat(preferred, false) ??
+      this.claimSeat(this.findFreeRestSeat({ col: ch.tileCol, row: ch.tileRow }), false);
   }
 
   /** Collect every tile occupied by electronics furniture (PCs, monitors, etc.). */
@@ -321,72 +430,6 @@ export class OfficeState {
     return false;
   }
 
-  /**
-   * Random-pick a seat from a candidate list, biased toward seats that face an
-   * electronics tile. Returns null when the candidate list is empty.
-   */
-  private pickFromSeats(seatUids: string[], electronicsTiles: Set<string>): string | null {
-    if (seatUids.length === 0) return null;
-    const pcSeats: string[] = [];
-    const otherSeats: string[] = [];
-    for (const uid of seatUids) {
-      const seat = this.seats.get(uid);
-      if (!seat) continue;
-      if (this.isSeatFacingElectronics(seat, electronicsTiles)) {
-        pcSeats.push(uid);
-      } else {
-        otherSeats.push(uid);
-      }
-    }
-    if (pcSeats.length > 0) return pcSeats[Math.floor(Math.random() * pcSeats.length)];
-    if (otherSeats.length > 0) return otherSeats[Math.floor(Math.random() * otherSeats.length)];
-    return null;
-  }
-
-  /**
-   * 3-stage seat picker for top-level agents.
-   *
-   *   Stage 1: If `folderName` is given and `areaMappings[folderName]` lists
-   *            Area labels, prefer free seats whose tile is labeled with one
-   *            of those areas.
-   *   Stage 2: Prefer free seats whose tile has NO area label (unzoned).
-   *   Stage 3: Any free seat.
-   *
-   * Each stage routes through `pickFromSeats` for the PC-bias rule. Returns
-   * null only when every seat is already occupied. Passing `undefined`
-   * preserves pre-Areas single-stage behavior (skips Stage 1; Stage 2 picks
-   * unzoned seats from a layout without `areaTiles`, which is every seat).
-   */
-  private findFreeSeat(folderName?: string): string | null {
-    const electronicsTiles = this.buildElectronicsTileSet();
-    const freeSeats: string[] = [];
-    for (const [uid, seat] of this.seats) {
-      if (!seat.assigned) freeSeats.push(uid);
-    }
-    if (freeSeats.length === 0) return null;
-
-    const areaLabels = folderName ? this.areaMappings[folderName] : undefined;
-
-    // Stage 1 — in-area seats for the folder's mapped Area labels.
-    if (areaLabels && areaLabels.length > 0) {
-      const wanted = new Set(areaLabels);
-      const inArea = freeSeats.filter((uid) => {
-        const label = this.seatZone(uid);
-        return label !== null && wanted.has(label);
-      });
-      const pick = this.pickFromSeats(inArea, electronicsTiles);
-      if (pick) return pick;
-    }
-
-    // Stage 2 — unzoned seats (no area label, or layout has no areas at all).
-    const unzoned = freeSeats.filter((uid) => this.seatZone(uid) === null);
-    const pick2 = this.pickFromSeats(unzoned, electronicsTiles);
-    if (pick2) return pick2;
-
-    // Stage 3 — any free seat.
-    return this.pickFromSeats(freeSeats, electronicsTiles);
-  }
-
   /** Closest walkable tile to (col,row) not occupied by another character, or null. */
   private closestFreeWalkableTile(col: number, row: number): { col: number; row: number } | null {
     const occupied = new Set<string>();
@@ -430,8 +473,16 @@ export class OfficeState {
     skipSpawnEffect?: boolean,
     folderName?: string,
     nearAgentId?: number,
+    preferredRestSeatId?: string,
   ): void {
-    if (this.characters.has(id)) return;
+    const existing = this.characters.get(id);
+    if (existing) {
+      // Re-added mid-despawn: revive it. Its seats are still held — they are
+      // only released once the despawn finishes.
+      if (existing.matrixEffect === 'despawn') startMatrixEffect(existing, 'spawn');
+      return;
+    }
+    if (this.overflow.some((e) => e.id === id)) return;
 
     let palette: number;
     let hueShift: number;
@@ -444,54 +495,99 @@ export class OfficeState {
       hueShift = pick.hueShift;
     }
 
-    // Try preferred seat first, then (for teammates) the seat closest to the
-    // anchor agent, then any free seat. anchorTile resolves to the anchor's SEAT
-    // (stable from creation) rather than its live tile, so a teammate placed while
-    // the lead is still walking to its seat still clusters around the final seat.
-    const anchor = nearAgentId !== undefined ? this.characters.get(nearAgentId) : undefined;
-    const anchorAt = anchorTile(anchor, this.seats);
-    let seatId: string | null = null;
-    if (preferredSeatId && this.seats.has(preferredSeatId)) {
-      const seat = this.seats.get(preferredSeatId)!;
-      if (!seat.assigned) {
-        seatId = preferredSeatId;
-      }
-    }
-    if (!seatId && anchorAt) {
-      seatId = closestFreeSeat(this.seats, anchorAt.col, anchorAt.row);
-    }
-    if (!seatId) {
-      seatId = this.findFreeSeat(folderName);
-    }
+    const entry: OverflowEntry = {
+      id,
+      palette,
+      hueShift,
+      folderName,
+      preferredSeatId,
+      preferredRestSeatId,
+      nearAgentId,
+      isActive: true,
+      isHeadless: false,
+    };
+    if (!this.place(entry, skipSpawnEffect)) this.overflow.push(entry);
+  }
 
-    let ch: Character;
-    if (seatId) {
-      const seat = this.seats.get(seatId)!;
-      seat.assigned = true;
-      ch = createCharacter(id, palette, seatId, seat, hueShift);
+  /** Agent ids waiting for a free work seat, oldest first (no character exists for them). */
+  getOverflowAgentIds(): number[] {
+    return this.overflow.map((e) => e.id);
+  }
+
+  /**
+   * Create the character for an agent or sub-agent on a free work seat (plus a
+   * rest seat for top-level agents). Returns false when no work seat is free.
+   *
+   * Top-level: persisted seat if still a free work seat, then (teammates) the
+   * work seat closest to the anchor's SEAT — stable from creation, so a
+   * teammate placed while the lead is still walking clusters around the final
+   * seat — then the folder/Area picker. Sub-agents: the work seat closest to
+   * the parent, or any work seat when the parent has no character.
+   */
+  private place(e: OverflowEntry, skipSpawnEffect = false): boolean {
+    const anchorId = e.parentAgentId ?? e.nearAgentId;
+    const anchorAt =
+      anchorId !== undefined ? anchorTile(this.characters.get(anchorId), this.seats) : undefined;
+    const seatId =
+      this.claimSeat(e.preferredSeatId, true) ??
+      this.claimSeat(
+        this.findFreeWorkSeat(anchorAt ? { near: anchorAt } : { folderName: e.folderName }),
+        true,
+      );
+    if (!seatId) return false;
+
+    const parent = e.parentAgentId !== undefined ? this.characters.get(e.parentAgentId) : undefined;
+    const ch = createCharacter(
+      e.id,
+      parent?.palette ?? e.palette,
+      seatId,
+      this.seats.get(seatId)!,
+      parent?.hueShift ?? e.hueShift,
+    );
+    ch.isActive = e.isActive;
+    if (e.isHeadless) ch.isHeadless = true;
+    if (e.folderName) ch.folderName = e.folderName;
+    if (e.parentAgentId !== undefined) {
+      ch.isSubagent = true;
+      ch.parentAgentId = e.parentAgentId;
     } else {
-      // No seats — teammates spawn beside their anchor, others at a random walkable tile
-      let spawn = anchorAt ? this.closestFreeWalkableTile(anchorAt.col, anchorAt.row) : null;
-      if (!spawn) {
-        spawn =
-          this.walkableTiles.length > 0
-            ? this.walkableTiles[Math.floor(Math.random() * this.walkableTiles.length)]
-            : { col: 1, row: 1 };
-      }
-      ch = createCharacter(id, palette, null, null, hueShift);
-      ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2;
-      ch.y = spawn.row * TILE_SIZE + TILE_SIZE / 2;
-      ch.tileCol = spawn.col;
-      ch.tileRow = spawn.row;
+      this.assignRestSeat(ch, e.preferredRestSeatId);
     }
+    if (!skipSpawnEffect) startMatrixEffect(ch, 'spawn');
+    this.characters.set(e.id, ch);
+    return true;
+  }
 
-    if (folderName) {
-      ch.folderName = folderName;
+  /** Promote overflow agents, oldest first, while work seats are free. */
+  private promoteOverflow(): void {
+    while (this.overflow.length > 0 && this.place(this.overflow[0])) this.overflow.shift();
+  }
+
+  private dropOverflow(id: number): boolean {
+    const i = this.overflow.findIndex((e) => e.id === id);
+    if (i >= 0) this.overflow.splice(i, 1);
+    return i >= 0;
+  }
+
+  private overflowEntryOf(ch: Character): OverflowEntry {
+    return {
+      id: ch.id,
+      palette: ch.palette,
+      hueShift: ch.hueShift,
+      folderName: ch.folderName,
+      nearAgentId: ch.leadAgentId,
+      parentAgentId: ch.isSubagent && ch.parentAgentId !== null ? ch.parentAgentId : undefined,
+      isActive: ch.isActive,
+      isHeadless: !!ch.isHeadless,
+    };
+  }
+
+  /** Release a character's work and rest seats. */
+  private releaseSeats(ch: Character): void {
+    for (const uid of [ch.seatId, ch.restSeatId]) {
+      const seat = uid ? this.seats.get(uid) : undefined;
+      if (seat) seat.assigned = false;
     }
-    if (!skipSpawnEffect) {
-      startMatrixEffect(ch, 'spawn');
-    }
-    this.characters.set(id, ch);
   }
 
   // ── Greeter ───────────────────────────────────────────────────
@@ -551,14 +647,12 @@ export class OfficeState {
   }
 
   removeAgent(id: number): void {
+    if (this.dropOverflow(id)) return;
     const ch = this.characters.get(id);
     if (!ch) return;
     if (ch.matrixEffect === 'despawn') return; // already despawning
-    // Free seat and clear selection immediately
-    if (ch.seatId) {
-      const seat = this.seats.get(ch.seatId);
-      if (seat) seat.assigned = false;
-    }
+    // Seats stay held until the despawn finishes (update), so nobody
+    // materializes on the chair while the old sprite is still dissolving.
     if (this.selectedAgentId === id) this.selectedAgentId = null;
     if (this.cameraFollowId === id) this.cameraFollowId = null;
     // Start despawn animation instead of immediate delete
@@ -574,49 +668,27 @@ export class OfficeState {
     return null;
   }
 
-  /** Reassign an agent from their current seat to a new seat */
+  /** Move an agent to another work seat. A refused move (seat missing, taken, or
+   *  not a work seat) leaves the agent on its current seat. */
   reassignSeat(agentId: number, seatId: string): void {
     const ch = this.characters.get(agentId);
-    if (!ch) return;
-    // Unassign old seat
-    if (ch.seatId) {
-      const old = this.seats.get(ch.seatId);
-      if (old) old.assigned = false;
-    }
-    // Assign new seat
+    if (!ch || ch.seatId === seatId) return;
     const seat = this.seats.get(seatId);
-    if (!seat || seat.assigned) return;
+    if (!seat || seat.assigned || !this.isWorkSeat(seatId)) return;
+    const old = ch.seatId ? this.seats.get(ch.seatId) : undefined;
+    if (old) old.assigned = false;
     seat.assigned = true;
     ch.seatId = seatId;
-    // Pathfind to new seat (unblock own seat tile for this query)
-    const path = this.withOwnSeatUnblocked(ch, () =>
-      findPath(ch.tileCol, ch.tileRow, seat.seatCol, seat.seatRow, this.tileMap, this.blockedTiles),
-    );
-    if (path.length > 0) {
-      ch.path = path;
-      ch.moveProgress = 0;
-      ch.state = CharacterState.WALK;
-      ch.frame = 0;
-      ch.frameTimer = 0;
-    } else {
-      // Already at seat or no path — sit down
-      ch.state = CharacterState.TYPE;
-      ch.dir = seat.facingDir;
-      ch.frame = 0;
-      ch.frameTimer = 0;
-      if (!ch.isActive) {
-        ch.seatTimer = INACTIVE_SEAT_TIMER_MIN_SEC + Math.random() * INACTIVE_SEAT_TIMER_RANGE_SEC;
-      }
-    }
+    this.headToWorkSeat(ch);
   }
 
   /**
-   * Move a just-linked teammate to the free seat closest to its lead, so teams
-   * cluster. Only moves when that seat is strictly closer than the teammate's
-   * current one — a teammate created as a plain external agent (seated by an
-   * arbitrary findFreeSeat) and tagged as a teammate only after tag discovery
-   * would otherwise keep its arbitrary seat, unlike an inline teammate seated
-   * next to the lead at creation.
+   * Move a just-linked teammate to the free work seat closest to its lead, so
+   * teams cluster. Only moves when that seat is strictly closer than the
+   * teammate's current one — a teammate created as a plain external agent
+   * (seated by the folder/Area picker) and tagged as a teammate only after tag
+   * discovery would otherwise keep its arbitrary seat, unlike an inline
+   * teammate seated next to the lead at creation.
    */
   private reseatNextToLead(teammateId: number, leadId: number): void {
     const teammate = this.characters.get(teammateId);
@@ -624,7 +696,7 @@ export class OfficeState {
     if (!teammate || !lead) return;
     const anchorAt = anchorTile(lead, this.seats);
     if (!anchorAt) return;
-    const target = closestFreeSeat(this.seats, anchorAt.col, anchorAt.row);
+    const target = this.findFreeWorkSeat({ near: anchorAt });
     if (!target || target === teammate.seatId) return;
     const targetSeat = this.seats.get(target)!;
     const targetDist =
@@ -638,30 +710,24 @@ export class OfficeState {
     }
   }
 
-  /** Send an agent back to their currently assigned seat */
+  /** Send an agent back to their work seat */
   sendToSeat(agentId: number): void {
     const ch = this.characters.get(agentId);
-    if (!ch || !ch.seatId) return;
-    const seat = this.seats.get(ch.seatId);
+    if (ch) this.headToWorkSeat(ch);
+  }
+
+  /** Walk (or sit) to the work seat. An idle agent sits there a few seconds
+   *  before its rest routine takes it back to the lounge. */
+  private headToWorkSeat(ch: Character): void {
+    const seat = ch.seatId ? this.seats.get(ch.seatId) : undefined;
     if (!seat) return;
-    const path = this.withOwnSeatUnblocked(ch, () =>
-      findPath(ch.tileCol, ch.tileRow, seat.seatCol, seat.seatRow, this.tileMap, this.blockedTiles),
-    );
-    if (path.length > 0) {
-      ch.path = path;
-      ch.moveProgress = 0;
-      ch.state = CharacterState.WALK;
-      ch.frame = 0;
-      ch.frameTimer = 0;
+    if (!ch.isActive) {
+      ch.seatTimer = INACTIVE_SEAT_TIMER_MIN_SEC + Math.random() * INACTIVE_SEAT_TIMER_RANGE_SEC;
+    }
+    if (ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
+      sit(ch, CharacterState.TYPE, seat.facingDir);
     } else {
-      // Already at seat — sit down
-      ch.state = CharacterState.TYPE;
-      ch.dir = seat.facingDir;
-      ch.frame = 0;
-      ch.frameTimer = 0;
-      if (!ch.isActive) {
-        ch.seatTimer = INACTIVE_SEAT_TIMER_MIN_SEC + Math.random() * INACTIVE_SEAT_TIMER_RANGE_SEC;
-      }
+      this.withOwnSeatUnblocked(ch, () => walkTo(ch, seat, this.tileMap, this.blockedTiles));
     }
   }
 
@@ -670,9 +736,8 @@ export class OfficeState {
     const ch = this.characters.get(agentId);
     if (!ch || ch.isSubagent) return false;
     if (!isWalkable(col, row, this.tileMap, this.blockedTiles)) {
-      // Also allow walking to own seat tile (blocked for others but not self)
-      const key = this.ownSeatKey(ch);
-      if (!key || key !== `${col},${row}`) return false;
+      // Also allow walking to own seat tiles (blocked for others but not self)
+      if (!this.ownSeatKeys(ch).includes(`${col},${row}`)) return false;
     }
     const path = this.withOwnSeatUnblocked(ch, () =>
       findPath(ch.tileCol, ch.tileRow, col, row, this.tileMap, this.blockedTiles),
@@ -686,59 +751,38 @@ export class OfficeState {
     return true;
   }
 
-  /** Create a sub-agent character with the parent's palette. Returns the sub-agent ID. */
+  /** Create a sub-agent with the parent's palette on the free work seat closest
+   *  to the parent (no rest seat). No free work seat → overflow. Returns the ID. */
   addSubagent(parentAgentId: number, parentToolId: string): number {
     const key = `${parentAgentId}:${parentToolId}`;
     if (this.subagentIdMap.has(key)) return this.subagentIdMap.get(key)!;
 
     const id = this.nextSubagentId--;
     const parentCh = this.characters.get(parentAgentId);
-    const palette = parentCh ? parentCh.palette : 0;
-    const hueShift = parentCh ? parentCh.hueShift : 0;
-
-    // Find the closest walkable tile to the parent, avoiding tiles occupied by other characters
-    const parentCol = parentCh ? parentCh.tileCol : 0;
-    const parentRow = parentCh ? parentCh.tileRow : 0;
-    let spawn = { col: parentCol, row: parentRow };
-    if (this.walkableTiles.length > 0) {
-      spawn = this.closestFreeWalkableTile(parentCol, parentRow) ?? this.walkableTiles[0];
-    }
-
-    const ch = createCharacter(id, palette, null, null, hueShift);
-    ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2;
-    ch.y = spawn.row * TILE_SIZE + TILE_SIZE / 2;
-    ch.tileCol = spawn.col;
-    ch.tileRow = spawn.row;
-    // Face the same direction as the parent agent
-    if (parentCh) ch.dir = parentCh.dir;
-    ch.isSubagent = true;
-    ch.parentAgentId = parentAgentId;
-    startMatrixEffect(ch, 'spawn');
-    this.characters.set(id, ch);
+    const entry: OverflowEntry = {
+      id,
+      palette: parentCh ? parentCh.palette : 0,
+      hueShift: parentCh ? parentCh.hueShift : 0,
+      parentAgentId,
+      isActive: true,
+      isHeadless: false,
+    };
+    if (!this.place(entry)) this.overflow.push(entry);
 
     this.subagentIdMap.set(key, id);
     this.subagentMeta.set(id, { parentAgentId, parentToolId });
     return id;
   }
 
-  /** Remove a specific sub-agent character and free its seat */
+  /** Remove a specific sub-agent (its seat frees when the despawn finishes) */
   removeSubagent(parentAgentId: number, parentToolId: string): void {
     const key = `${parentAgentId}:${parentToolId}`;
     const id = this.subagentIdMap.get(key);
     if (id === undefined) return;
 
+    this.dropOverflow(id);
     const ch = this.characters.get(id);
-    if (ch) {
-      if (ch.matrixEffect === 'despawn') {
-        // Already despawning — just clean up maps
-        this.subagentIdMap.delete(key);
-        this.subagentMeta.delete(id);
-        return;
-      }
-      if (ch.seatId) {
-        const seat = this.seats.get(ch.seatId);
-        if (seat) seat.assigned = false;
-      }
+    if (ch && ch.matrixEffect !== 'despawn') {
       // Start despawn animation — keep character in map for rendering
       startMatrixEffect(ch, 'despawn');
       ch.bubbleType = null;
@@ -752,35 +796,10 @@ export class OfficeState {
 
   /** Remove all sub-agents belonging to a parent agent */
   removeAllSubagents(parentAgentId: number): void {
-    const toRemove: string[] = [];
-    for (const [key, id] of this.subagentIdMap) {
-      const meta = this.subagentMeta.get(id);
-      if (meta && meta.parentAgentId === parentAgentId) {
-        const ch = this.characters.get(id);
-        if (ch) {
-          if (ch.matrixEffect === 'despawn') {
-            // Already despawning — just clean up maps
-            this.subagentMeta.delete(id);
-            toRemove.push(key);
-            continue;
-          }
-          if (ch.seatId) {
-            const seat = this.seats.get(ch.seatId);
-            if (seat) seat.assigned = false;
-          }
-          // Start despawn animation
-          startMatrixEffect(ch, 'despawn');
-          ch.bubbleType = null;
-        }
-        this.subagentMeta.delete(id);
-        if (this.selectedAgentId === id) this.selectedAgentId = null;
-        if (this.cameraFollowId === id) this.cameraFollowId = null;
-        toRemove.push(key);
-      }
-    }
-    for (const key of toRemove) {
-      this.subagentIdMap.delete(key);
-    }
+    const toolIds = [...this.subagentMeta.values()]
+      .filter((m) => m.parentAgentId === parentAgentId)
+      .map((m) => m.parentToolId);
+    for (const toolId of toolIds) this.removeSubagent(parentAgentId, toolId);
   }
 
   /** Look up the sub-agent character ID for a given parent+toolId, or null */
@@ -789,16 +808,13 @@ export class OfficeState {
   }
 
   setAgentActive(id: number, active: boolean): void {
+    const waiting = this.overflow.find((e) => e.id === id);
+    if (waiting) waiting.isActive = active;
     const ch = this.characters.get(id);
     if (ch) {
+      // Turn just ended: linger at the PC for REST_DELAY_SEC before the rest routine.
+      if (ch.isActive && !active) ch.seatTimer = REST_DELAY_SEC;
       ch.isActive = active;
-      if (!active) {
-        // Sentinel -1: signals turn just ended, skip next seat rest timer.
-        // Prevents the WALK handler from setting a 2-4 min rest on arrival.
-        ch.seatTimer = -1;
-        ch.path = [];
-        ch.moveProgress = 0;
-      }
       this.rebuildFurnitureInstances();
     }
   }
@@ -1074,6 +1090,8 @@ export class OfficeState {
 
   /** Mark an agent as headless (adopted, no terminal to focus). */
   setHeadless(id: number, headless: boolean): void {
+    const waiting = this.overflow.find((e) => e.id === id);
+    if (waiting) waiting.isHeadless = headless;
     const ch = this.characters.get(id);
     if (!ch) return;
     ch.isHeadless = headless;
@@ -1109,9 +1127,9 @@ export class OfficeState {
         continue; // skip normal FSM while the effect is (or just was) active
       }
 
-      // Temporarily unblock own seat so character can pathfind to it
+      // Temporarily unblock own seats (work + rest) so the character can path to them
       this.withOwnSeatUnblocked(ch, () =>
-        updateCharacter(ch, dt, this.walkableTiles, this.seats, this.tileMap, this.blockedTiles),
+        updateCharacter(ch, dt, this.seats, this.tileMap, this.blockedTiles),
       );
 
       // Tick bubble timer for waiting bubbles
@@ -1123,10 +1141,12 @@ export class OfficeState {
         }
       }
     }
-    // Remove characters that finished despawn
+    // Remove characters that finished despawn; their seats go to the overflow queue
     for (const id of toDelete) {
+      this.releaseSeats(this.characters.get(id)!);
       this.characters.delete(id);
     }
+    if (toDelete.length > 0) this.promoteOverflow();
 
     // ── Pet FSM ────────────────────────────────────────────────
     for (const pet of this.pets) {
@@ -1143,18 +1163,24 @@ export class OfficeState {
     }
   }
 
-  /** The `saveAgentSeats` payload: palette, hue and seat for every agent worth
-   *  restoring. Sub-agents are excluded because they are derived state the
-   *  runtime re-materializes, and the greeter never reaches here at all —
-   *  it is not in `characters`. */
-  getPersistableSeats(): Record<
-    number,
-    { palette: number; hueShift: number; seatId: string | null }
-  > {
-    const seats: Record<number, { palette: number; hueShift: number; seatId: string | null }> = {};
+  /** The `saveAgentSeats` payload: palette, hue, work seat and rest seat for
+   *  every agent worth restoring (overflow agents with null seats). Sub-agents
+   *  are excluded because they are derived state the runtime re-materializes,
+   *  and the greeter never reaches here at all — it is not in `characters`. */
+  getPersistableSeats(): Record<number, PersistedSeat> {
+    const seats: Record<number, PersistedSeat> = {};
     for (const ch of this.characters.values()) {
       if (ch.isSubagent) continue;
-      seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId: ch.seatId };
+      seats[ch.id] = {
+        palette: ch.palette,
+        hueShift: ch.hueShift,
+        seatId: ch.seatId,
+        restSeatId: ch.restSeatId,
+      };
+    }
+    for (const e of this.overflow) {
+      if (e.parentAgentId !== undefined) continue;
+      seats[e.id] = { palette: e.palette, hueShift: e.hueShift, seatId: null, restSeatId: null };
     }
     return seats;
   }
@@ -1178,7 +1204,10 @@ export class OfficeState {
       if (ch.matrixEffect === 'despawn') continue;
       // Character sprite is 16x24, anchored bottom-center
       // Apply sitting offset to match visual position
-      const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0;
+      const sittingOffset =
+        ch.state === CharacterState.TYPE || ch.state === CharacterState.REST
+          ? CHARACTER_SITTING_OFFSET_PX
+          : 0;
       const anchorY = ch.y + sittingOffset;
       const left = ch.x - CHARACTER_HIT_HALF_WIDTH;
       const right = ch.x + CHARACTER_HIT_HALF_WIDTH;

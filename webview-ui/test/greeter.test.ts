@@ -29,6 +29,7 @@ import { GREETER_ID, GREETER_TILE_MARGIN } from '../src/constants.js';
 import { OfficeState } from '../src/office/engine/officeState.js';
 import type { OfficeLayout } from '../src/office/types.js';
 import { CharacterState, MATRIX_EFFECT_DURATION, TileType } from '../src/office/types.js';
+import { userLayout } from './fixtures/office.js';
 
 /** All-floor layout, no furniture — no catalog needed, every tile walkable. */
 function floorLayout(cols = 9, rows = 7): OfficeLayout {
@@ -151,7 +152,8 @@ test('is invisible to hit-testing — clicks pass through', () => {
  * draws.
  */
 test('lives outside the agent map, and is drawn anyway', () => {
-  const os = new OfficeState(floorLayout());
+  // Agents only materialize on a free work seat (PC-facing), so use a real layout.
+  const os = new OfficeState(userLayout());
   os.addAgent(1, 0, 0);
   os.spawnGreeter();
 
@@ -178,7 +180,7 @@ test('never reaches the persisted seat payload', () => {
 });
 
 test('does not consume a palette slot in diversity counting', () => {
-  const os = new OfficeState(floorLayout());
+  const os = new OfficeState(userLayout());
   // char_0 is the greeter's palette. If it counted toward diversity, the first
   // real agent would be steered away from palette 0 by a prop.
   os.spawnGreeter();

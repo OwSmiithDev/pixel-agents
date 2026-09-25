@@ -11,12 +11,14 @@ export const MAX_ROWS = 64;
 export const WALK_SPEED_PX_PER_SEC = 48;
 export const WALK_FRAME_DURATION_SEC = 0.15;
 export const TYPE_FRAME_DURATION_SEC = 0.3;
-export const WANDER_PAUSE_MIN_SEC = 2.0;
-export const WANDER_PAUSE_MAX_SEC = 20.0;
-export const WANDER_MOVES_BEFORE_REST_MIN = 3;
-export const WANDER_MOVES_BEFORE_REST_MAX = 6;
-export const SEAT_REST_MIN_SEC = 120.0;
-export const SEAT_REST_MAX_SEC = 240.0;
+/** Seconds an agent stays at its PC after the turn ends before walking to its rest seat. */
+export const REST_DELAY_SEC = 2;
+
+// ── Seat areas (area labels, compared case-insensitively) ────
+/** Seats in this area are reserved for the IDE agent (skipped by normal auto-assignment). */
+export const IDE_AREA_LABEL = 'ide';
+/** Rest seats inside these areas are preferred. */
+export const REST_AREA_LABELS = ['descanso', 'lounge', 'rest'];
 
 // ── Matrix Effect ────────────────────────────────────────────
 export const MATRIX_EFFECT_DURATION_SEC = 0.3;
