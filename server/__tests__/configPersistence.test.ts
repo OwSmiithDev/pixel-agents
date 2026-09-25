@@ -1,7 +1,21 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// os.homedir() ignores HOME on Windows (it reads USERPROFILE), so redirect it at
+// the module seam; a HOME override alone would read/write the REAL user profile.
+const home = vi.hoisted(() => ({ dir: '' }));
+vi.mock('os', async () => {
+  const actual = await vi.importActual<typeof import('os')>('os');
+  return {
+    ...actual,
+    homedir: () => {
+      if (!home.dir) throw new Error('test home not set: refusing to resolve the real homedir');
+      return home.dir;
+    },
+  };
+});
 
 import {
   clearHooksAnswer,
@@ -19,20 +33,13 @@ import {
 
 describe('configPersistence: areas', () => {
   let tempHome: string;
-  let originalHome: string | undefined;
 
   beforeEach(() => {
     tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-config-test-'));
-    originalHome = process.env.HOME;
-    process.env.HOME = tempHome;
+    home.dir = tempHome;
   });
 
   afterEach(() => {
-    if (originalHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = originalHome;
-    }
     fs.rmSync(tempHome, { recursive: true, force: true });
   });
 

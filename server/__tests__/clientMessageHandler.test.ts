@@ -1,7 +1,21 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// os.homedir() ignores HOME on Windows (it reads USERPROFILE), so redirect it at
+// the module seam; a HOME override alone would read/write the REAL user profile.
+const home = vi.hoisted(() => ({ dir: '' }));
+vi.mock('os', async () => {
+  const actual = await vi.importActual<typeof import('os')>('os');
+  return {
+    ...actual,
+    homedir: () => {
+      if (!home.dir) throw new Error('test home not set: refusing to resolve the real homedir');
+      return home.dir;
+    },
+  };
+});
 
 import { AgentStateStore } from '../src/agentStateStore.js';
 import {
@@ -52,12 +66,11 @@ function createTestAgent(overrides: Partial<AgentState> = {}): AgentState {
 /**
  * These tests exercise the area-related dispatch branches and the load-order
  * invariant in handleWebviewReady. They isolate the on-disk config + state
- * files by redirecting $HOME to a fresh temp dir for every test, so the
+ * files by redirecting os.homedir() to a fresh temp dir for every test, so the
  * standalone adapter writes its config.json there.
  */
 describe('clientMessageHandler: areas + carpet wire ordering', () => {
   let tempHome: string;
-  let originalHome: string | undefined;
   let store: AgentStateStore;
   let sent: Array<Record<string, unknown>>;
   let ctx: ClientMessageContext;
@@ -68,8 +81,7 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
 
   beforeEach(() => {
     tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-cmh-test-'));
-    originalHome = process.env.HOME;
-    process.env.HOME = tempHome;
+    home.dir = tempHome;
 
     store = new AgentStateStore();
     store.setAdapter(new FileStateAdapter({ namespace: 'standalone' }));
@@ -78,11 +90,6 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
   });
 
   afterEach(() => {
-    if (originalHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = originalHome;
-    }
     store.dispose();
     fs.rmSync(tempHome, { recursive: true, force: true });
   });
@@ -424,7 +431,6 @@ describe('clientMessageHandler: areas + carpet wire ordering', () => {
 
 describe('clientMessageHandler: saveAgentSeats palette sync', () => {
   let tempHome: string;
-  let originalHome: string | undefined;
   let store: AgentStateStore;
   let sent: Array<Record<string, unknown>>;
   let ctx: ClientMessageContext;
@@ -435,8 +441,7 @@ describe('clientMessageHandler: saveAgentSeats palette sync', () => {
 
   beforeEach(() => {
     tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-cmh-seats-'));
-    originalHome = process.env.HOME;
-    process.env.HOME = tempHome;
+    home.dir = tempHome;
 
     store = new AgentStateStore();
     store.setAdapter(new FileStateAdapter({ namespace: 'standalone' }));
@@ -445,11 +450,6 @@ describe('clientMessageHandler: saveAgentSeats palette sync', () => {
   });
 
   afterEach(() => {
-    if (originalHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = originalHome;
-    }
     store.dispose();
     fs.rmSync(tempHome, { recursive: true, force: true });
   });

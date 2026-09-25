@@ -11,7 +11,9 @@ let tmpHome: string;
 let workspaceDir: string;
 
 function makeNodeCommand(scriptPath: string): string {
-  return `${JSON.stringify(process.execPath)} ${JSON.stringify(scriptPath)}`;
+  // Plain quotes, as the real installer writes (`node "<script>"`): JSON.stringify
+  // would double every Windows backslash, and the runner's path match would miss.
+  return `"${process.execPath}" "${scriptPath}"`;
 }
 
 function writeHookScript(scriptPath: string, outputPath: string): void {
@@ -53,7 +55,10 @@ function runMockClaude(
       cwd: workspaceDir,
       env: {
         ...process.env,
+        // USERPROFILE too: on Windows the child's os.homedir() ignores HOME and
+        // would read the REAL ~/.claude/settings.json and run the user's hooks.
         HOME: tmpHome,
+        USERPROFILE: tmpHome,
       },
       stdio: ['ignore', 'ignore', 'pipe'],
     });

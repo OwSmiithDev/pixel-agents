@@ -1,6 +1,19 @@
 import * as os from 'os';
 import * as path from 'path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// getTeamMembers reads ~/.claude/teams via os.homedir(); point it at a temp dir so
+// these tests never write to the REAL home (HOME is ignored on Windows anyway).
+const tmpHome = vi.hoisted(() => {
+  const nodeFs = require('fs') as typeof import('fs');
+  const nodeOs = require('os') as typeof import('os');
+  const nodePath = require('path') as typeof import('path');
+  return nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), 'pxl-team-test-'));
+});
+vi.mock('os', async () => {
+  const actual = await vi.importActual<typeof import('os')>('os');
+  return { ...actual, homedir: () => tmpHome };
+});
 
 import { claudeTeamProvider } from '../src/providers/hook/claude/claudeTeamProvider.js';
 
@@ -388,7 +401,7 @@ describe('claudeTeamProvider', () => {
   });
 
   describe('getTeamMembers', () => {
-    // Writes under ~/.claude/teams/<TEAM_NAME>/ and cleans up in afterEach.
+    // Writes under <temp home>/.claude/teams/<TEAM_NAME>/ and cleans up in afterEach.
     const fs = require('fs') as typeof import('fs');
     const TEAM_NAME = 'test-team-' + Date.now();
 

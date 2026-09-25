@@ -1,7 +1,21 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// os.homedir() ignores HOME on Windows (it reads USERPROFILE), so redirect it at
+// the module seam; a HOME override alone would read/write the REAL user profile.
+const home = vi.hoisted(() => ({ dir: '' }));
+vi.mock('os', async () => {
+  const actual = await vi.importActual<typeof import('os')>('os');
+  return {
+    ...actual,
+    homedir: () => {
+      if (!home.dir) throw new Error('test home not set: refusing to resolve the real homedir');
+      return home.dir;
+    },
+  };
+});
 
 import { AgentStateStore } from '../src/agentStateStore.js';
 import { type ClientMessageContext, handleClientMessage } from '../src/clientMessageHandler.js';
@@ -32,7 +46,6 @@ function settle(): Promise<void> {
  */
 describe('clientMessageHandler: hooks consent flow', () => {
   let tempHome: string;
-  let originalHome: string | undefined;
   let store: AgentStateStore;
   let sent: Array<Record<string, unknown>>;
   let ctx: ClientMessageContext;
@@ -75,8 +88,7 @@ describe('clientMessageHandler: hooks consent flow', () => {
 
   beforeEach(() => {
     tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-consent-flow-'));
-    originalHome = process.env.HOME;
-    process.env.HOME = tempHome;
+    home.dir = tempHome;
 
     store = new AgentStateStore();
     store.setAdapter(new FileStateAdapter({ namespace: 'standalone' }));
@@ -85,11 +97,6 @@ describe('clientMessageHandler: hooks consent flow', () => {
   });
 
   afterEach(() => {
-    if (originalHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = originalHome;
-    }
     store.dispose();
     fs.rmSync(tempHome, { recursive: true, force: true });
   });
