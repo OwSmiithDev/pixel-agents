@@ -52,7 +52,19 @@ node /caminho/para/pixel-agents/dist/cli.js --port 3100
 
 Abra a URL impressa (ela contém `?token=` — não compartilhe). Inicie o `claude` em outro terminal na mesma pasta.
 
-**No VS Code** — abra esta pasta no VS Code e pressione **F5** para rodar a extensão em modo de desenvolvimento.
+**No VS Code (instalado)** — gere o pacote e instale:
+
+```bash
+npx @vscode/vsce package --no-dependencies            # gera pixel-agents-smiith-<versão>.vsix
+code --uninstall-extension pablodelucca.pixel-agents   # se a versão oficial estiver instalada
+code --install-extension pixel-agents-smiith-1.4.1.vsix
+```
+
+A extensão tem ID próprio (`owsmiithdev.pixel-agents-smiith`), então as atualizações da loja não a substituem.
+Ela usa os mesmos comandos e painéis da oficial — mantenha só uma das duas instalada.
+Depois de instalar, feche e reabra o VS Code e aceite a instalação dos hooks no painel (**Settings → hooks**).
+
+**No VS Code (desenvolvimento)** — abra esta pasta no VS Code e pressione **F5**.
 
 ## Onde está cada coisa
 

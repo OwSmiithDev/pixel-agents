@@ -1,12 +1,12 @@
 {
-  "name": "pixel-agents",
-  "displayName": "Pixel Agents",
-  "description": "Pixel art office where your Claude Code agents come to life as animated characters",
+  "name": "pixel-agents-smiith",
+  "displayName": "Pixel Agents · Smiith Edition",
+  "description": "Pixel art office where your Claude Code agents come to life — with a lit 3D view and the Smiith Tech office. Fork of Pixel Agents by Pablo De Lucca.",
   "version": "1.4.1",
-  "publisher": "pablodelucca",
+  "publisher": "owsmiithdev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pixel-agents-hq/pixel-agents"
+    "url": "https://github.com/OwSmiithDev/pixel-agents"
   },
   "workspaces": [
     "server",
