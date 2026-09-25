@@ -28,7 +28,7 @@ describe('consent copy', () => {
     expect(full).toContain(`${CLAUDE_HOOK_EVENTS.length.toString()} Claude Code events`);
     expect(full).toContain('your existing settings are kept');
     expect(full).toContain(`settings.json${SETTINGS_BACKUP_SUFFIX}`);
-    expect(full).toContain('tool names and tool inputs');
+    expect(full).toContain('tool names, tool inputs and your prompts');
     expect(full).toContain('127.0.0.1');
     expect(full).toContain('Settings → Instant Detection (Hooks)');
   });
@@ -44,7 +44,7 @@ describe('consent copy', () => {
       `${CLAUDE_HOOK_EVENTS.length.toString()} Claude Code events`,
     );
     expect(CONSENT_DISCLOSURE).toContain(`settings.json${SETTINGS_BACKUP_SUFFIX}`);
-    expect(CONSENT_DISCLOSURE).toContain('tool names and tool inputs');
+    expect(CONSENT_DISCLOSURE).toContain('tool names, tool inputs and your prompts');
     expect(CONSENT_DISCLOSURE).toContain('127.0.0.1');
     expect(CONSENT_DISCLOSURE).toContain('Settings → Instant Detection (Hooks)');
   });

@@ -112,7 +112,7 @@ function legacyClaudeSettings(thirdPartyCommand: string): unknown {
   for (const event of events) {
     hooks[event] = [{ matcher: '', hooks: [{ type: 'command', command, timeout: 5 }] }];
   }
-  (hooks['UserPromptSubmit'] as Array<{ hooks: Array<unknown> }>)[0].hooks.unshift({
+  (hooks['TaskCreated'] as Array<{ hooks: Array<unknown> }>)[0].hooks.unshift({
     type: 'command',
     command: thirdPartyCommand,
   });
@@ -162,7 +162,7 @@ test.describe('Hooks consent gate', () => {
     // The disclosure is the point: what is written, what data moves, how to undo.
     const text = (await dialog.textContent()) ?? '';
     expect(text).toContain('One more thing: hooks!');
-    expect(text).toMatch(/adds hooks for 12 Claude Code events/);
+    expect(text).toMatch(/adds hooks for 13 Claude Code events/);
     expect(text).toContain('~/.claude/settings.json');
     expect(text).toContain('.pixel-agents.backup');
     expect(text).toMatch(/tool inputs/);
@@ -189,11 +189,11 @@ test.describe('Hooks consent gate', () => {
     narrator.step('clicking Install Hooks');
     await dialog.getByRole('button', { name: 'Install Hooks' }).click();
 
-    await expect.poll(() => ourHookEvents(tmpHome).length, { timeout: 15_000 }).toBe(12);
-    expect(ourHookEvents(tmpHome)).not.toContain('UserPromptSubmit');
+    await expect.poll(() => ourHookEvents(tmpHome).length, { timeout: 15_000 }).toBe(13);
+    expect(ourHookEvents(tmpHome)).toContain('UserPromptSubmit');
     expect(ourHookEvents(tmpHome)).not.toContain('TaskCreated');
     expect(readConsent(tmpHome)).toBe(true);
-    narrator.check('12 events installed, prompt-forwarding events not among them');
+    narrator.check('13 events installed, TaskCreated not among them');
 
     // The install broadcast a hooksStatus installed:true — which moots an
     // UNANSWERED ask, but must not yank the tour away from the person who just
@@ -305,7 +305,7 @@ test.describe('Hooks consent gate', () => {
 
     narrator.step('installing, then walking back to revise');
     await dialog.getByRole('button', { name: 'Install Hooks' }).click();
-    await expect.poll(() => ourHookEvents(tmpHome).length, { timeout: 15_000 }).toBe(12);
+    await expect.poll(() => ourHookEvents(tmpHome).length, { timeout: 15_000 }).toBe(13);
     expect(readConsent(tmpHome)).toBe(true);
     narrator.check('the install landed');
 
@@ -457,24 +457,24 @@ test.describe('Hooks consent gate / pre-consent install', () => {
 
   // ZERO friction for the population that already had our hooks: no prompt at
   // all, just the migration. The reinstall only ever REDUCES scope — it drops
-  // UserPromptSubmit and TaskCreated, the two events that forwarded prompt text
-  // and were consumed by nothing — so a prompt would buy this user nothing they
+  // TaskCreated, consumed by nothing (UserPromptSubmit, already installed, stays
+  // for task titles) — so a prompt would buy this user nothing they
   // do not already have. The removal route the disclosure promises is the
   // Settings toggle, exercised end-to-end by the next test.
-  test('a pre-consent 14-event install migrates to 12 with no prompt @area:cross-cutting', async ({
+  test('a pre-consent 14-event install migrates to 13 with no prompt @area:cross-cutting', async ({
     pixelAgents,
   }) => {
     const { frame, tmpHome, narrator } = pixelAgents;
 
-    await expect.poll(() => ourHookEvents(tmpHome).length, { timeout: 30_000 }).toBe(12);
-    expect(ourHookEvents(tmpHome)).not.toContain('UserPromptSubmit');
+    await expect.poll(() => ourHookEvents(tmpHome).length, { timeout: 30_000 }).toBe(13);
+    expect(ourHookEvents(tmpHome)).toContain('UserPromptSubmit');
     expect(ourHookEvents(tmpHome)).not.toContain('TaskCreated');
     expect(readConsent(tmpHome)).toBe(true);
-    // The third-party hook that shared the UserPromptSubmit entry survives.
+    // The third-party hook that shared the TaskCreated entry survives.
     expect(JSON.stringify(readSettings(tmpHome))).toContain(THIRD_PARTY);
     // And the unrelated settings key nobody asked us to touch.
     expect(readSettings(tmpHome).permissions).toEqual({ allow: ['Bash(ls:*)'] });
-    narrator.check('migrated to 12 events; third-party hook and unrelated keys survived');
+    narrator.check('migrated to 13 events; third-party hook and unrelated keys survived');
 
     // The whole point: nothing was ever asked. The consent dialog stays open
     // until answered, so it would still be on screen right now — an absent
@@ -508,7 +508,7 @@ test.describe('Hooks consent gate / pre-consent install', () => {
 
     // The silent migration lands first, so the toggle below is a genuine state
     // change over live hooks rather than a no-op click.
-    await expect.poll(() => ourHookEvents(tmpHome).length, { timeout: 30_000 }).toBe(12);
+    await expect.poll(() => ourHookEvents(tmpHome).length, { timeout: 30_000 }).toBe(13);
     expect(await getSettingChecked(frame, 'Instant Detection (Hooks)')).toBe(true);
     narrator.check('migrated hooks installed and the checkbox reads ON');
 
@@ -557,7 +557,7 @@ test.describe('Hooks consent gate / toggle-off failure', () => {
 
     // Startup installed for real (consent seeded), so the checkbox is ON and
     // the toggle below is a genuine state change rather than a no-op click.
-    await expect.poll(() => ourHookEvents(tmpHome).length, { timeout: 30_000 }).toBe(12);
+    await expect.poll(() => ourHookEvents(tmpHome).length, { timeout: 30_000 }).toBe(13);
     expect(await getSettingChecked(frame, 'Instant Detection (Hooks)')).toBe(true);
     narrator.check('hooks installed and the checkbox reads ON');
 

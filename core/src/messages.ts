@@ -25,6 +25,7 @@ export type ServerMessage =
   | SubagentToolPermission
   | AgentTeamInfo
   | AgentContextUsage
+  | AgentTask
   | LayoutLoaded
   | FurnitureAssetsLoaded
   | CharacterSpritesLoaded
@@ -55,6 +56,7 @@ export type ClientMessage =
   | HooksConsentResponse
   | SetHooksInfoShown
   | SetWatchAllSessions
+  | SetTaskTitleFromPrompt
   | ExportLayout
   | ImportLayout
   | OpenSessionsFolder
@@ -188,6 +190,15 @@ export interface AgentContextUsage {
   maxContextTokens: number;
 }
 
+export interface AgentTask {
+  type: 'agentTask';
+  id: number;
+  title: string | null;
+  source: AgentTaskSource;
+}
+
+export type AgentTaskSource = 'tag' | 'todo' | 'prompt';
+
 export interface LayoutLoaded {
   type: 'layoutLoaded';
   layout: Record<string, any> | null;
@@ -275,6 +286,7 @@ export interface SettingsLoaded {
   hooksInfoShown: boolean;
   externalAssetDirectories: string[];
   showAreas: boolean;
+  taskTitleFromPrompt?: boolean;
 }
 
 export interface HooksStatus {
@@ -391,6 +403,11 @@ export interface SetHooksInfoShown {
 
 export interface SetWatchAllSessions {
   type: 'setWatchAllSessions';
+  enabled: boolean;
+}
+
+export interface SetTaskTitleFromPrompt {
+  type: 'setTaskTitleFromPrompt';
   enabled: boolean;
 }
 

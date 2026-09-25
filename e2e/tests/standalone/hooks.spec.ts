@@ -148,7 +148,7 @@ test.describe('Standalone / hooks consent', () => {
     await dialog.getByRole('button', { name: 'Install Hooks' }).click();
 
     await expect.poll(() => readConsentFrom(standalone.tmpHome), { timeout: 15_000 }).toBe(true);
-    await expect.poll(() => ourHookEventCount(standalone.tmpHome), { timeout: 15_000 }).toBe(12);
+    await expect.poll(() => ourHookEventCount(standalone.tmpHome), { timeout: 15_000 }).toBe(13);
 
     // The install's own hooksStatus broadcast must not yank the closing step.
     await finishIntro(dialog);
@@ -225,7 +225,7 @@ test.describe('Standalone / hooks consent', () => {
     await hooksCheckbox.click();
 
     await expect.poll(() => readConsentFrom(standalone.tmpHome), { timeout: 15_000 }).toBe(true);
-    await expect.poll(() => ourHookEventCount(standalone.tmpHome), { timeout: 15_000 }).toBe(12);
+    await expect.poll(() => ourHookEventCount(standalone.tmpHome), { timeout: 15_000 }).toBe(13);
     await expect.poll(() => isChecked(), { timeout: 15_000 }).toBe(true);
   });
 });

@@ -84,5 +84,11 @@ export function resendAgentActivity(
         maxContextTokens: agent.maxContextTokens,
       });
     }
+
+    // 6. Task title (last value sent; none sent = no title)
+    const task = agent.taskTitle?.sent;
+    if (task) {
+      send({ type: 'agentTask', id, title: task.title, source: task.source });
+    }
   }
 }

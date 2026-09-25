@@ -47,6 +47,12 @@ export const GLOBAL_SCAN_ACTIVE_MIN_SIZE = 3_072; // 3KB
 /** Only adopt global JSONL files modified within this window */
 export const GLOBAL_SCAN_ACTIVE_MAX_AGE_MS = 600_000; // 10 minutes
 
+// ── Task titles (server/src/taskTitle.ts) ───────────────────
+/** Max characters of a derived task title (ellipsis included). */
+export const TASK_TITLE_MAX_LENGTH = 60;
+/** Max words taken from the start of a prompt when it carries no tag line. */
+export const TASK_TITLE_MAX_WORDS = 8;
+
 // ── Display Truncation + Pixel Agents Server paths ──────────
 // Centralized in core/src/constants.ts; re-exported here for back-compat.
 export {

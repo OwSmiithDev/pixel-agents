@@ -146,7 +146,7 @@ describe('claudeHookInstaller', () => {
   //     "remove" leaves behind something this reports as absent.
   it('areHooksInstalled is true for leftovers under an unlisted event', () => {
     const entry = { matcher: '', hooks: [{ type: 'command', command: ourCommand(), timeout: 5 }] };
-    fs.writeFileSync(settingsPathFor(), JSON.stringify({ hooks: { UserPromptSubmit: [entry] } }));
+    fs.writeFileSync(settingsPathFor(), JSON.stringify({ hooks: { TaskCreated: [entry] } }));
 
     expect(areHooksInstalled()).toBe(true);
   });
@@ -701,7 +701,7 @@ describe('claudeHookInstaller', () => {
     fs.writeFileSync(
       settingsPath,
       JSON.stringify({
-        hooks: { UserPromptSubmit: [null, 'junk'], Stop: [null, 'junk', malformedEntry] },
+        hooks: { TaskCreated: [null, 'junk'], Stop: [null, 'junk', malformedEntry] },
       }),
     );
 
@@ -720,7 +720,7 @@ describe('claudeHookInstaller', () => {
     expect(hooks['Stop'][2]).toEqual(malformedEntry);
     // The unlisted event is untouched: nothing of OURS was in it, so we have
     // no business rewriting it at all.
-    expect(hooks['UserPromptSubmit']).toEqual([null, 'junk']);
+    expect(hooks['TaskCreated']).toEqual([null, 'junk']);
   });
 
   // 8k-4. The sentinel collision, isolated: a settings.json with NO Pixel
@@ -913,20 +913,20 @@ describe('claudeHookInstaller', () => {
 
   // ── W4: event-scope reduction + stale-install migration ───────
 
-  it('installs no UserPromptSubmit or TaskCreated hook', async () => {
+  it('installs UserPromptSubmit (task titles) but no TaskCreated hook', async () => {
     await installHooks();
     const hooks = readSettings().hooks as Record<string, unknown[]>;
-    expect(hooks['UserPromptSubmit']).toBeUndefined();
+    expect(hooks['UserPromptSubmit']).toHaveLength(1);
     expect(hooks['TaskCreated']).toBeUndefined();
     expect(Object.keys(hooks).sort()).toEqual([...CLAUDE_HOOK_EVENTS].sort());
   });
 
   // The migration that matters: a legacy 14-event install still satisfies
-  // areHooksInstalled (superset), so nothing else would ever strip the two
-  // prompt-forwarding events. The next install must do it.
+  // areHooksInstalled (superset), so nothing else would ever strip the
+  // unlisted TaskCreated event. The next install must do it.
   it('strips our hooks from unlisted events left by a legacy install', async () => {
     const settingsPath = settingsPathFor();
-    const legacyEvents = [...CLAUDE_HOOK_EVENTS, 'UserPromptSubmit', 'TaskCreated'];
+    const legacyEvents = [...CLAUDE_HOOK_EVENTS, 'TaskCreated'];
     const theirCommand = 'node /elsewhere/other-tool.js';
     const hooks: Record<string, unknown[]> = {};
     for (const event of legacyEvents) {
@@ -934,9 +934,9 @@ describe('claudeHookInstaller', () => {
         { matcher: '', hooks: [{ type: 'command', command: ourCommand(), timeout: 5 }] },
       ];
     }
-    // A third-party hook sharing the UserPromptSubmit entry must survive the sweep.
+    // A third-party hook sharing the TaskCreated entry must survive the sweep.
     (
-      hooks['UserPromptSubmit'] as Array<{ hooks: Array<{ type: string; command: string }> }>
+      hooks['TaskCreated'] as Array<{ hooks: Array<{ type: string; command: string }> }>
     )[0].hooks.unshift({
       type: 'command',
       command: theirCommand,
@@ -952,11 +952,9 @@ describe('claudeHookInstaller', () => {
       string,
       Array<{ hooks: Array<{ command: string }> }>
     >;
-    // TaskCreated held only our hook -> emptied and removed entirely.
-    expect(after['TaskCreated']).toBeUndefined();
-    // UserPromptSubmit kept the third-party hook and lost only ours.
-    expect(after['UserPromptSubmit']).toHaveLength(1);
-    expect(after['UserPromptSubmit'][0].hooks.map((h) => h.command)).toEqual([theirCommand]);
+    // TaskCreated kept the third-party hook and lost only ours.
+    expect(after['TaskCreated']).toHaveLength(1);
+    expect(after['TaskCreated'][0].hooks.map((h) => h.command)).toEqual([theirCommand]);
     // Every installed event still carries exactly one of ours.
     for (const event of CLAUDE_HOOK_EVENTS) {
       expect(after[event].flatMap((e) => e.hooks.map((h) => h.command))).toEqual([ourCommand()]);

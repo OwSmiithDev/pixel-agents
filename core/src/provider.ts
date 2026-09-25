@@ -11,6 +11,15 @@ import type { TeamProvider } from './teamProvider.js';
 
 // ── Normalized Events (all provider types produce these) ──────
 
+/** A change to the agent's to-do list, extracted by the provider from its own
+ *  todo/task tools. `set` replaces the in-progress item (null = none);
+ *  `create`/`update` describe individually-addressed tasks, whose ids the
+ *  runtime correlates (`update` may omit the subject it had at `create`). */
+export type TodoSignal =
+  | { op: 'set'; title: string | null }
+  | { op: 'create'; subject: string }
+  | { op: 'update'; taskId: string; status?: string; subject?: string };
+
 export type AgentEvent =
   | {
       kind: 'toolStart';
@@ -21,6 +30,14 @@ export type AgentEvent =
        *  `run_in_background` on Agent/Task). Handlers use this to suppress ghost
        *  sub-agent characters for teammate spawns. */
       runInBackground?: boolean;
+      /** Set when the tool edits the agent's to-do list (drives the task title). */
+      todo?: TodoSignal;
+    }
+  | {
+      /** The user submitted a prompt. The provider derives the short task title
+       *  at normalization and drops the prompt text: it never travels further. */
+      kind: 'userPrompt';
+      task: { title: string; source: 'tag' | 'prompt' } | null;
     }
   | { kind: 'toolEnd'; toolId: string }
   | {

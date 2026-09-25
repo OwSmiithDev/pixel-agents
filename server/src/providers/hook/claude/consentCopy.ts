@@ -34,7 +34,8 @@ export const CONSENT_FACT_WHAT =
  *  thing that changes it, rather than making a promise the software can be
  *  asked to break. */
 export const CONSENT_FACT_DATA =
-  'Claude Code will send those events - including tool names and tool inputs - to a Pixel Agents ' +
+  'Claude Code will send those events - including tool names, tool inputs and your prompts (reduced ' +
+  'on arrival to a short task title; the prompt itself is never kept) - to a Pixel Agents ' +
   'server on this machine. Everything stays local - the server listens only on 127.0.0.1 - unless ' +
   'you explicitly start it with --host to expose it on your network.';
 

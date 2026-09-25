@@ -12,6 +12,9 @@ export interface AdapterSettings {
   watchAllSessions: boolean;
   hooksInfoShown: boolean;
   showAreas: boolean;
+  /** Derive agent task titles from prompts (tag line / first words). Todo titles
+   *  work regardless. */
+  taskTitleFromPrompt: boolean;
   areaMappings: Record<string, string[]>;
 }
 
@@ -27,6 +30,7 @@ export const ADAPTER_SETTING_KEYS = [
   'watchAllSessions',
   'hooksInfoShown',
   'showAreas',
+  'taskTitleFromPrompt',
   'areaMappings',
 ] as const;
 
@@ -63,6 +67,7 @@ const DEFAULT_ADAPTER_SETTINGS: AdapterSettings = {
   watchAllSessions: false,
   hooksInfoShown: false,
   showAreas: false,
+  taskTitleFromPrompt: true,
   areaMappings: {},
 };
 
@@ -144,6 +149,10 @@ function parseAdapterSettings(raw: unknown): AdapterSettings {
         : DEFAULT_ADAPTER_SETTINGS.hooksInfoShown,
     showAreas:
       typeof obj.showAreas === 'boolean' ? obj.showAreas : DEFAULT_ADAPTER_SETTINGS.showAreas,
+    taskTitleFromPrompt:
+      typeof obj.taskTitleFromPrompt === 'boolean'
+        ? obj.taskTitleFromPrompt
+        : DEFAULT_ADAPTER_SETTINGS.taskTitleFromPrompt,
     areaMappings: parseAreaMappings(obj.areaMappings),
   };
 }

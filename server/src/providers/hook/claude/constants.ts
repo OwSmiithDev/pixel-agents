@@ -19,18 +19,22 @@ export const LEGACY_HOOK_SCRIPT_NAME = 'pixel-agents-hook.js';
  *  SessionStart/SessionEnd handle session lifecycle (start, /clear, resume, exit).
  *  Stop/PermissionRequest/Notification handle turn completion and permission UI.
  *  SubagentStart/SubagentStop/TeammateIdle/TaskCompleted power Agent Teams.
+ *  UserPromptSubmit feeds the per-agent task title (`agentTask`): the provider
+ *  derives a <= 60-char title from the prompt at normalization and drops the
+ *  prompt itself -- it is never stored, logged, persisted or forwarded.
  *
- *  Deliberately NOT installed: UserPromptSubmit and TaskCreated. Both normalize
- *  to null (nothing in the runtime consumes them), so installing them only
- *  forwarded the user's prompt text and task payloads to the server to be
- *  dropped. A legacy install that still carries them is migrated on the next
- *  install (see installEntries' unlisted-event sweep). */
+ *  Deliberately NOT installed: TaskCreated. It normalizes to null (nothing in
+ *  the runtime consumes it; TaskCreate is already seen via PreToolUse), so
+ *  installing it only forwarded task payloads to be dropped. A legacy install
+ *  that still carries it is migrated on the next install (see installEntries'
+ *  unlisted-event sweep). */
 export const CLAUDE_HOOK_EVENTS = [
   'SessionStart',
   'SessionEnd',
   'Stop',
   'PermissionRequest',
   'Notification',
+  'UserPromptSubmit',
   'PreToolUse',
   'PostToolUse',
   'PostToolUseFailure',

@@ -625,8 +625,8 @@ function installEntries(): Promise<boolean> {
 
     // Migration sweep FIRST: strip our commands from every event we no longer
     // install. The per-event loop below only touches listed events, so without
-    // this a legacy install (which included UserPromptSubmit and TaskCreated)
-    // would keep forwarding prompt text and task payloads forever — the users
+    // this a legacy install (which included TaskCreated) would keep
+    // forwarding task payloads forever — the users
     // with the widest install would be the only ones never migrated.
     const listed = new Set<string>(CLAUDE_HOOK_EVENTS);
     for (const event of Object.keys(hooks)) {

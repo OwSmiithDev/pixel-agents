@@ -4,6 +4,12 @@ import type { AgentEvent, HookProvider } from '../../core/src/provider.js';
 import type { AgentStateStore } from './agentStateStore.js';
 import { SESSION_END_GRACE_MS } from './constants.js';
 import type { SessionRouter } from './sessionRouter.js';
+import {
+  applyPromptTitle,
+  applyTodoSignal,
+  createTaskTitleState,
+  takeTaskTitleChange,
+} from './taskTitle.js';
 import { getInlineTeammates, hasInlineTeammates, hasPromotedBackgroundAgent } from './teamUtils.js';
 import { cancelPermissionTimer, cancelWaitingTimer } from './timerManager.js';
 import { notifyBackgroundAgentCompleted } from './transcriptParser.js';
@@ -69,6 +75,8 @@ export class HookEventHandler {
     private provider: HookProvider,
     private sessionRouter: SessionRouter,
     private watchAllSessionsRef?: { current: boolean },
+    /** `taskTitleFromPrompt` setting: false disables the tag and prompt title sources. */
+    private taskTitleFromPromptRef?: { current: boolean },
   ) {
     if (provider.protocolVersion !== HookEventHandler.SUPPORTED_PROTOCOL_VERSION) {
       console.warn(
@@ -359,7 +367,21 @@ export class HookEventHandler {
       case 'progress':
         // Not yet consumed by the office visualization. Silently drop.
         return;
+      case 'userPrompt': {
+        const state = (agent.taskTitle ??= createTaskTitleState());
+        applyPromptTitle(
+          state,
+          this.taskTitleFromPromptRef?.current === false ? null : normEvent.task,
+        );
+        return this.broadcastTaskTitle(agent, agentId);
+      }
     }
+  }
+
+  /** Send `agentTask` when the agent's derived task title changed. */
+  private broadcastTaskTitle(agent: AgentState, agentId: number): void {
+    const change = agent.taskTitle && takeTaskTitleChange(agent.taskTitle);
+    if (change) this.agents.broadcast({ type: 'agentTask', id: agentId, ...change });
   }
 
   /**
@@ -430,6 +452,11 @@ export class HookEventHandler {
     // from the lead or any teammate -- they share session_id). Suppress hook-originated
     // tool display on the lead. Both lead and teammate tools display via JSONL polling.
     if (hasInlineTeammates(agentId, this.agents)) return;
+
+    if (normEvent.todo) {
+      applyTodoSignal((agent.taskTitle ??= createTaskTitleState()), normEvent.todo);
+      this.broadcastTaskTitle(agent, agentId);
+    }
 
     // Cancel waiting, mark active
     cancelWaitingTimer(agentId, this.waitingTimers);

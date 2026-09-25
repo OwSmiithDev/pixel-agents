@@ -106,12 +106,26 @@ describe('claudeProvider', () => {
       }
     });
 
-    it('ignores UserPromptSubmit (no normalized kind yet)', () => {
+    it('normalizes UserPromptSubmit to userPrompt with a derived title, dropping the prompt', () => {
+      const raw: Record<string, unknown> = {
+        hook_event_name: 'UserPromptSubmit',
+        session_id: 'sess-1',
+        prompt: 'Fix the flaky login test, token=abc123 do not leak this please',
+      };
+      const result = claudeProvider.normalizeHookEvent(raw);
+      expect(result?.event).toEqual({
+        kind: 'userPrompt',
+        task: { title: 'Fix the flaky login test, token=abc123 do not', source: 'prompt' },
+      });
+      expect(raw.prompt).toBe('Fix the flaky login test, token=abc123 do not');
+    });
+
+    it('normalizes UserPromptSubmit without a prompt to a null task', () => {
       const result = claudeProvider.normalizeHookEvent({
         hook_event_name: 'UserPromptSubmit',
         session_id: 'sess-1',
       });
-      expect(result).toBeNull();
+      expect(result?.event).toEqual({ kind: 'userPrompt', task: null });
     });
 
     it('normalizes SubagentStart with agent_type as toolName', () => {

@@ -3,11 +3,12 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { normalizeProjectPath } from '../../../../../core/src/normalizeProjectPath.js';
-import type { AgentEvent, HookProvider } from '../../../../../core/src/provider.js';
+import type { AgentEvent, HookProvider, TodoSignal } from '../../../../../core/src/provider.js';
 import {
   BASH_COMMAND_DISPLAY_MAX_LENGTH,
   TASK_DESCRIPTION_DISPLAY_MAX_LENGTH,
 } from '../../../constants.js';
+import { deriveTitleFromPrompt } from '../../../taskTitle.js';
 import {
   areHooksInstalled as installerAreHooksInstalled,
   installHooks as installerInstallHooks,
@@ -69,6 +70,35 @@ export function formatToolStatus(toolName: string, input?: unknown): string {
     }
     default:
       return `Using ${toolName}`;
+  }
+}
+
+// ── Todo / task tools -> TodoSignal (task title source "todo") ──
+
+export function todoSignalFromTool(toolName: string, input: unknown): TodoSignal | undefined {
+  const inp = (input ?? {}) as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === 'string' ? v : undefined);
+  switch (toolName) {
+    case 'TodoWrite': {
+      const todos = Array.isArray(inp.todos) ? (inp.todos as Array<Record<string, unknown>>) : [];
+      const current = todos.find((t) => t && typeof t === 'object' && t.status === 'in_progress');
+      return {
+        op: 'set',
+        title: current ? (str(current.activeForm) ?? str(current.content) ?? null) : null,
+      };
+    }
+    case 'TaskCreate': {
+      const subject = str(inp.subject);
+      return subject === undefined ? undefined : { op: 'create', subject };
+    }
+    case 'TaskUpdate': {
+      const taskId = str(inp.taskId);
+      return taskId === undefined
+        ? undefined
+        : { op: 'update', taskId, status: str(inp.status), subject: str(inp.subject) };
+    }
+    default:
+      return undefined;
   }
 }
 
@@ -148,6 +178,7 @@ function normalizeHookEvent(
           toolName,
           input: toolInput,
           runInBackground: toolInput.run_in_background === true,
+          todo: todoSignalFromTool(toolName, toolInput),
         },
       };
     }
@@ -159,12 +190,15 @@ function normalizeHookEvent(
     case 'Stop':
       return { sessionId, event: { kind: 'turnEnd' } };
 
-    case 'UserPromptSubmit':
-      // No normalized kind for user prompts yet; silently ignore. No longer
-      // installed (it forwarded the prompt text here only to be dropped), but a
-      // stale install keeps POSTing it until its next install/uninstall runs,
-      // so the drop must stay graceful.
-      return null;
+    case 'UserPromptSubmit': {
+      // The prompt is private and untrusted: derive the short task title HERE and
+      // drop the text. The raw payload is overwritten too, because the handler may
+      // buffer it (unregistered session) and re-normalize it later -- the
+      // replacement re-derives to the same title and holds nothing more.
+      const task = deriveTitleFromPrompt(raw.prompt);
+      raw.prompt = task ? (task.source === 'tag' ? `TASK: ${task.title}` : task.title) : '';
+      return { sessionId, event: { kind: 'userPrompt', task } };
+    }
 
     case 'SubagentStart': {
       const agentType = typeof raw.agent_type === 'string' ? raw.agent_type : 'unknown';

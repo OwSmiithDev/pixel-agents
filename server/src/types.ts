@@ -1,5 +1,7 @@
 import type * as vscode from 'vscode';
 
+import type { TaskTitleState } from './taskTitle.js';
+
 export interface AgentState {
   id: number;
   sessionId: string;
@@ -46,6 +48,9 @@ export interface AgentState {
    *  routing in SubagentStart. Set in PreToolUse, NOT cleared in PostToolUse (survives
    *  the PostToolUse-before-SubagentStart race); overwritten on the next PreToolUse. */
   currentHookIsTeammateSpawn?: boolean;
+  /** Task title derivation (server/src/taskTitle.ts). Holds derived titles only,
+   *  never prompt text. Transient, lazily created, never persisted. */
+  taskTitle?: TaskTitleState;
 
   // -- Context window usage (server/src/contextUsage.ts) --
   /** Tokens in the agent's context as of its newest turn; 0 until one is seen.

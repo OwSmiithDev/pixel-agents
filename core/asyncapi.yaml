@@ -100,6 +100,8 @@ components:
         - $ref: '#/components/schemas/AgentTeamInfo'
         # Context window
         - $ref: '#/components/schemas/AgentContextUsage'
+        # Task title
+        - $ref: '#/components/schemas/AgentTask'
         # Layout
         - $ref: '#/components/schemas/LayoutLoaded'
         # Assets
@@ -136,6 +138,7 @@ components:
         - $ref: '#/components/schemas/HooksConsentResponse'
         - $ref: '#/components/schemas/SetHooksInfoShown'
         - $ref: '#/components/schemas/SetWatchAllSessions'
+        - $ref: '#/components/schemas/SetTaskTitleFromPrompt'
         - $ref: '#/components/schemas/ExportLayout'
         - $ref: '#/components/schemas/ImportLayout'
         - $ref: '#/components/schemas/OpenSessionsFolder'
@@ -442,6 +445,33 @@ components:
         maxContextTokens:
           type: integer
 
+    AgentTask:
+      description: |
+        Short title of what the agent is working on, derived by the server from
+        (in priority order) a tag line in the latest prompt
+        (TASK/TAREFA/TÍTULO/TITULO/TITLE/OBJECTIVE:), the in-progress todo, or
+        the first words of the latest prompt. At most 60 characters, plain text
+        (render as text, never as HTML). The prompt itself is never sent.
+        Sent whenever the title changes and replayed on connect. `title: null`
+        clears it; `source` is then the source of the title being cleared.
+      type: object
+      additionalProperties: false
+      required: [type, id, title, source]
+      properties:
+        type:
+          const: agentTask
+        id:
+          type: integer
+        title:
+          type: [string, 'null']
+        source:
+          $ref: '#/components/schemas/AgentTaskSource'
+
+    AgentTaskSource:
+      description: Where an agent's task title came from.
+      type: string
+      enum: [tag, todo, prompt]
+
     LayoutLoaded:
       description: |
         Office layout (tiles, furniture, colors). `null` when no layout file or
@@ -669,6 +699,11 @@ components:
             type: string
         showAreas:
           type: boolean
+        taskTitleFromPrompt:
+          type: boolean
+          description: >-
+            Whether task titles may be derived from prompts (tag line / first
+            words). Absent = true (older hosts).
 
     HooksStatus:
       description: |
@@ -973,6 +1008,19 @@ components:
       properties:
         type:
           const: setWatchAllSessions
+        enabled:
+          type: boolean
+
+    SetTaskTitleFromPrompt:
+      description: >-
+        Toggle deriving task titles from prompts. Enabling requires a
+        privileged (tokened) client; disabling is always allowed.
+      type: object
+      additionalProperties: false
+      required: [type, enabled]
+      properties:
+        type:
+          const: setTaskTitleFromPrompt
         enabled:
           type: boolean
 

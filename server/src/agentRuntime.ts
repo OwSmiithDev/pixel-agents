@@ -77,6 +77,8 @@ export class AgentRuntime {
   // Configuration refs (mutable, shared with scanners)
   readonly watchAllSessions = { current: false };
   readonly hooksEnabled = { current: true };
+  /** `taskTitleFromPrompt` setting (default on): tag/prompt task-title sources. */
+  readonly taskTitleFromPrompt = { current: true };
 
   // Dependencies
   readonly dismissalTracker = new DismissalTracker();
@@ -149,6 +151,7 @@ export class AgentRuntime {
       provider,
       new SessionRouter(),
       this.watchAllSessions,
+      this.taskTitleFromPrompt,
     );
 
     // Wire hook lifecycle callbacks to shared agent operations

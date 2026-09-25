@@ -70,6 +70,7 @@ const KEY_GHOST_HEADLESS_AGENTS = 'pixel-agents.ghostHeadlessAgents';
 const KEY_WATCH_ALL_SESSIONS = 'pixel-agents.watchAllSessions';
 const KEY_HOOKS_INFO_SHOWN = 'pixel-agents.hooksInfoShown';
 const KEY_SHOW_AREAS = 'pixel-agents.showAreas';
+const KEY_TASK_TITLE_FROM_PROMPT = 'pixel-agents.taskTitleFromPrompt';
 
 /**
  * Handle incoming ClientMessage from a WebSocket client.
@@ -171,6 +172,16 @@ export function handleClientMessage(
     case 'setGhostHeadlessAgents':
       adapter?.setSetting(KEY_GHOST_HEADLESS_AGENTS, msg.enabled);
       break;
+
+    case 'setTaskTitleFromPrompt': {
+      const enabled = msg.enabled === true;
+      // Turning it ON widens what every connected client sees (prompt-derived
+      // titles), so only a tokened client may do that; anyone may turn it off.
+      if (enabled && !ctx.privileged) break;
+      adapter?.setSetting(KEY_TASK_TITLE_FROM_PROMPT, enabled);
+      if (runtime) runtime.taskTitleFromPrompt.current = enabled;
+      break;
+    }
 
     case 'setWatchAllSessions': {
       const enabled = msg.enabled as boolean;
@@ -410,6 +421,7 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
   // its sole webview reader is the hooks tooltip gate.
   const hooksEnabled = getHooksEnabled(claudeProvider.id);
   const showAreas = adapter?.getSetting(KEY_SHOW_AREAS, false) ?? false;
+  const taskTitleFromPrompt = adapter?.getSetting(KEY_TASK_TITLE_FROM_PROMPT, true) ?? true;
   send({
     type: 'settingsLoaded',
     soundEnabled: adapter?.getSetting(KEY_SOUND_ENABLED, true) ?? true,
@@ -422,6 +434,7 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
     hooksInfoShown: adapter?.getSetting(KEY_HOOKS_INFO_SHOWN, false) ?? false,
     externalAssetDirectories: cfg.externalAssetDirectories,
     showAreas,
+    taskTitleFromPrompt,
   });
 
   // 4a. Actual install state, distinct from the hooksEnabled preference —
@@ -472,6 +485,7 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
   if (runtime) {
     runtime.watchAllSessions.current = watchAllSessions;
     runtime.hooksEnabled.current = hooksEnabled;
+    runtime.taskTitleFromPrompt.current = taskTitleFromPrompt;
   }
 
   // 5. Restore persisted external agents (standalone only; VS Code handles its own restore)

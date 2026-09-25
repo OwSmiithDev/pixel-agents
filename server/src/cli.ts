@@ -245,6 +245,10 @@ async function main(): Promise<void> {
     // scanners grow per-provider awareness alongside the Settings UI.
     runtime.hooksEnabled.current = getHooksEnabled(claudeProvider.id);
     runtime.watchAllSessions.current = adapter.getSetting('pixel-agents.watchAllSessions', false);
+    runtime.taskTitleFromPrompt.current = adapter.getSetting(
+      'pixel-agents.taskTitleFromPrompt',
+      true,
+    );
 
     // Install hooks on startup if the persisted setting says so — gated on the
     // one-time consent to modify ~/.claude/settings.json.
@@ -253,9 +257,9 @@ async function main(): Promise<void> {
       if (!consent && (await claudeProvider.areHooksInstalled())) {
         // Our hooks are already installed and already firing — a pre-consent
         // version put them there. Grant and continue with NO prompt: the
-        // install below is the 14 -> 12 migration, and it only ever REDUCES
-        // scope (it drops UserPromptSubmit and TaskCreated, the two events that
-        // forwarded prompt text and were consumed by nothing). Asking would buy
+        // install below is the 14 -> 13 migration, and it only ever REDUCES
+        // scope (it drops TaskCreated, consumed by nothing; UserPromptSubmit,
+        // which such installs already carry, is kept for task titles). Asking would buy
         // this user no protection they do not already have, so they are not
         // asked. A fresh install still is, in full — in the browser UI, when a
         // tokened client connects (clientMessageHandler's webviewReady).
