@@ -229,6 +229,13 @@ export class HookEventHandler {
               );
               this.sessionRouter.unregister(agent.sessionId);
               this.registerAgent(event.session_id, id);
+              // A new session: the old title and task-id tracking (ids restart
+              // at "1") belong to the previous one. Keep `sent` so clients get
+              // the null.
+              if (agent.taskTitle) {
+                agent.taskTitle = { ...createTaskTitleState(), sent: agent.taskTitle.sent };
+                this.broadcastTaskTitle(agent, id);
+              }
               this.lifecycleCallbacks.onSessionClear?.(id, event.session_id, transcriptPath);
               return;
             }
@@ -458,15 +465,17 @@ export class HookEventHandler {
     agent.currentHookIsTeammateSpawn =
       this.provider.team?.isTeammateSpawnCall(toolName, toolInput) ?? false;
 
-    // When a lead has inline teammates, hook tool events are ambiguous (could be
-    // from the lead or any teammate -- they share session_id). Suppress hook-originated
-    // tool display on the lead. Both lead and teammate tools display via JSONL polling.
-    if (hasInlineTeammates(agentId, this.agents)) return;
-
+    // Todo titles first: a team lead's TodoWrite/TaskUpdate must still title it
+    // (the inline-teammate return below only suppresses tool DISPLAY).
     if (normEvent.todo) {
       applyTodoSignal((agent.taskTitle ??= createTaskTitleState()), normEvent.todo);
       this.broadcastTaskTitle(agent, agentId);
     }
+
+    // When a lead has inline teammates, hook tool events are ambiguous (could be
+    // from the lead or any teammate -- they share session_id). Suppress hook-originated
+    // tool display on the lead. Both lead and teammate tools display via JSONL polling.
+    if (hasInlineTeammates(agentId, this.agents)) return;
 
     // Cancel waiting, mark active
     cancelWaitingTimer(agentId, this.waitingTimers);

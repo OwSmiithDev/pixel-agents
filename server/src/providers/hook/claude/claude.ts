@@ -99,7 +99,7 @@ export function todoSignalFromTool(toolName: string, input: unknown): TodoSignal
       return subject === undefined ? undefined : { op: 'create', subject };
     }
     case 'TaskUpdate': {
-      const taskId = str(inp.taskId);
+      const taskId = typeof inp.taskId === 'number' ? String(inp.taskId) : str(inp.taskId);
       return taskId === undefined
         ? undefined
         : { op: 'update', taskId, status: str(inp.status), subject: str(inp.subject) };

@@ -87,10 +87,16 @@ describe('deriveTitleFromPrompt', () => {
   );
 
   it('removes control chars and collapses whitespace', () => {
-    expect(deriveTitleFromPrompt('Fix\u0007 the\u0000bug‮\n\n\t now')).toEqual({
+    expect(deriveTitleFromPrompt('Fix\u0007 the\u0000bug\u202E\n\n\t now')).toEqual({
       title: 'Fix the bug now',
       source: 'prompt',
     });
+  });
+
+  it('removes every format char: BOM, word joiner, soft hyphen, Arabic/Mongolian marks, tags, bidi isolates', () => {
+    expect(
+      sanitizeTitle('a\uFEFFb\u2060c\u2064d\u00ADe\u061Cf\u180Eg\u{E0041}h\u2066i\u2069j\u200Bk'),
+    ).toBe('a b c d e f g h i j k');
   });
 
   it('does not interpret HTML (text passes through as text)', () => {
@@ -132,6 +138,13 @@ describe('todoSignalFromTool', () => {
       op: 'update',
       taskId: '2',
       status: 'in_progress',
+      subject: undefined,
+    });
+    // A numeric id (as the tool may send it) is kept, as its string form.
+    expect(todoSignalFromTool('TaskUpdate', { taskId: 2, status: 'completed' })).toEqual({
+      op: 'update',
+      taskId: '2',
+      status: 'completed',
       subject: undefined,
     });
   });
@@ -263,6 +276,51 @@ describe('agentTask via HookEventHandler', () => {
       { type: 'agentTask', id: 1, title: 'Second task', source: 'todo' },
       { type: 'agentTask', id: 1, title: null, source: 'todo' },
     ]);
+  });
+
+  it('/clear drops the old title and restarts task-id tracking for the new session', () => {
+    tool('TaskCreate', { subject: 'Old first', description: 'x' });
+    tool('TaskUpdate', { taskId: '1', status: 'in_progress' });
+    handler.handleEvent('claude', {
+      hook_event_name: 'SessionEnd',
+      session_id: 'sess-1',
+      reason: 'clear',
+    });
+    handler.handleEvent('claude', {
+      hook_event_name: 'SessionStart',
+      session_id: 'sess-2',
+      source: 'clear',
+      transcript_path: '/test/sess-2.jsonl',
+    });
+    expect(tasks().at(-1)).toEqual({ type: 'agentTask', id: 1, title: null, source: 'todo' });
+
+    handler.handleEvent('claude', {
+      hook_event_name: 'PreToolUse',
+      session_id: 'sess-2',
+      tool_name: 'TaskCreate',
+      tool_input: { subject: 'New first', description: 'y' },
+    });
+    handler.handleEvent('claude', {
+      hook_event_name: 'PreToolUse',
+      session_id: 'sess-2',
+      tool_name: 'TaskUpdate',
+      tool_input: { taskId: '1', status: 'in_progress' },
+    });
+    expect(tasks().at(-1)).toEqual({
+      type: 'agentTask',
+      id: 1,
+      title: 'New first',
+      source: 'todo',
+    });
+  });
+
+  it('a lead with inline teammates still gets todo titles (tool display stays suppressed)', () => {
+    agents.set(2, createTestAgent({ id: 2, sessionId: 'sess-1', leadAgentId: 1 }));
+    tool('TodoWrite', { todos: [{ content: 'Coordinate team', status: 'in_progress' }] });
+    expect(tasks()).toEqual([
+      { type: 'agentTask', id: 1, title: 'Coordinate team', source: 'todo' },
+    ]);
+    expect(messages.some((m) => m.type === 'agentToolStart' && m.id === 1)).toBe(false);
   });
 
   it('sends only on change', () => {

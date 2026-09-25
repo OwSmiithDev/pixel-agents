@@ -28,8 +28,8 @@ export interface DerivedPromptTitle {
 const TAG_LINE = /^[ \t]*(TASK|TAREFA|TÍTULO|TITULO|TITLE|OBJECTIVE)[ \t]*:[ \t]*(.+)$/imu;
 /** Closed fences, plus an unterminated one running to the end. */
 const CODE_FENCE = /```[\s\S]*?(?:```|$)/g;
-/** C0/C1 controls, zero-width and bidi-override characters. */
-const CONTROL_CHARS = /[\p{Cc}​-‏‪-‮⁦-⁩]/gu;
+/** Every control (Cc: C0/C1) and format (Cf: zero-width, bidi, soft hyphen, BOM, tags…) character. */
+const CONTROL_CHARS = /[\p{Cc}\p{Cf}]/gu;
 
 /** Untrusted text -> single-line, whitespace-collapsed, length-capped title, or
  *  null when nothing is left. Plain text only: no HTML is interpreted or escaped
