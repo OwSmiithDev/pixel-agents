@@ -17,7 +17,11 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import type { IntroTourState } from '../src/hooks/introTourState.js';
-import { INTRO_TOUR_IDLE, reduceIntroTour } from '../src/hooks/introTourState.js';
+import {
+  dropMootedConsentAsks,
+  INTRO_TOUR_IDLE,
+  reduceIntroTour,
+} from '../src/hooks/introTourState.js';
 
 const REQUEST = {
   type: 'hooksConsentRequest',
@@ -216,4 +220,12 @@ test("an ANSWERED tour holds its snapshot against a different provider's request
   );
   assert.equal(state.intro, REQUEST, 'the answered tour keeps its own snapshot');
   assert.equal(state.awaitingOutcome, true, 'its verdict wait survives');
+});
+
+test('a later installed:true drops a first-run install ask but keeps a re-consent ask', () => {
+  const install = { ...REQUEST };
+  const reconsent = { ...REQUEST, reconsent: true as const };
+  const other = { ...REQUEST, providerId: 'codex' };
+  assert.deepEqual(dropMootedConsentAsks([install, other], 'claude'), [other]);
+  assert.deepEqual(dropMootedConsentAsks([reconsent, other], 'claude'), [reconsent, other]);
 });

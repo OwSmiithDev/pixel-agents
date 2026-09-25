@@ -100,3 +100,16 @@ export function reduceIntroTour(state: IntroTourState, event: IntroTourEvent): I
       return INTRO_TOUR_IDLE;
   }
 }
+
+/**
+ * The consent queue after a hooksStatus reports `providerId` installed. That moots a first-run install ask for
+ * that provider (the Settings toggle or another tab installed while the dialog was open), so it is dropped rather
+ * than let a stale approval re-install. A re-consent ask is NOT answered by it: its population has hooks installed
+ * by definition, so it stays. Other providers' asks are untouched.
+ */
+export function dropMootedConsentAsks(
+  queue: HooksConsentRequest[],
+  providerId: string,
+): HooksConsentRequest[] {
+  return queue.filter((r) => r.providerId !== providerId || r.reconsent === true);
+}

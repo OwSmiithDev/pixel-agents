@@ -21,6 +21,7 @@ import type { OfficeLayout, ToolActivity } from '../office/types.js';
 import { setWallSprites } from '../office/wallTiles.js';
 import { isBrowserRuntime, isE2E } from '../runtime.js';
 import { transport } from '../transport/index.js';
+import { dropMootedConsentAsks } from './introTourState.js';
 
 /**
  * A Headless agent is one the office adopted from outside (`claude -p`, a session
@@ -715,10 +716,8 @@ export function useExtensionMessages(
           setHooksInstalled((m) => ({ ...m, [providerId]: installed }));
           setHooksStatusSeq((m) => ({ ...m, [providerId]: (m[providerId] ?? 0) + 1 }));
           if (installed) {
-            // Moot once THIS provider's hooks are installed — the Settings toggle or another tab granted consent
-            // while the dialog was open. Drop it from the queue (head or queued) rather than let a stale approval
-            // re-install; another provider's status is not about this ask.
-            setConsentQueue((q) => q.filter((r) => r.providerId !== providerId));
+            // Moot THIS provider's install asks (head or queued); re-consent asks survive (see helper).
+            setConsentQueue((q) => dropMootedConsentAsks(q, providerId));
           }
         }
       } else if (msg.type === 'hooksConsentRequest') {
