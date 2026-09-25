@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState } from 'react';
 
 import { Button } from '../../components/ui/Button.js';
@@ -40,6 +41,16 @@ interface ToolOverlayProps {
   panRef: React.RefObject<{ x: number; y: number }>;
   onCloseAgent: (id: number) => void;
   alwaysShowOverlay: boolean;
+  /**
+   * Optional screen projection (3D view). Maps a character's ground position
+   * plus a vertical lift in sprite pixels (negative = up) to container CSS px.
+   * Defaults to the 2D canvas projection.
+   */
+  anchorToScreen?: (
+    worldX: number,
+    groundY: number,
+    liftPx: number,
+  ) => { x: number; y: number } | null;
 }
 
 /** Derive a short human-readable activity string from tools/status */
@@ -92,7 +103,9 @@ export function ToolOverlay({
   panRef,
   onCloseAgent,
   alwaysShowOverlay,
+  anchorToScreen,
 }: ToolOverlayProps) {
+  const reduceMotion = useReducedMotion();
   const [, setTick] = useState(0);
   useEffect(() => {
     let rafId = 0;
@@ -135,8 +148,13 @@ export function ToolOverlay({
 
         // Position above character
         const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0;
-        const screenX = project.toScreenX(ch.x);
-        const screenY = project.toScreenY(ch.y + sittingOffset - TOOL_OVERLAY_VERTICAL_OFFSET);
+        const lift = sittingOffset - TOOL_OVERLAY_VERTICAL_OFFSET;
+        const anchor = anchorToScreen
+          ? anchorToScreen(ch.x, ch.y, lift)
+          : { x: project.toScreenX(ch.x), y: project.toScreenY(ch.y + lift) };
+        if (!anchor) return null;
+        const screenX = anchor.x;
+        const screenY = anchor.y;
 
         // A "Done" agent (finished turn: waiting bubble without awaitingInput)
         // shows ONLY its floating green checkmark bubble, never the label panel
@@ -225,7 +243,12 @@ export function ToolOverlay({
             data-testid="agent-overlay"
             data-agent-id={id}
           >
-            <div className="flex items-center border-border px-8 pt-2 pb-4 gap-5 pixel-panel whitespace-nowrap max-w-2xs">
+            <motion.div
+              className="flex items-center border-border px-8 pt-2 pb-4 gap-5 pixel-panel whitespace-nowrap max-w-2xs"
+              initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 520, damping: 34, mass: 0.6 }}
+            >
               {dotColor && (
                 <span
                   className={`w-6 h-6 rounded-full shrink-0 ${isActive && !hasPermission && !hasWaiting ? 'pixel-pulse' : ''}`}
@@ -274,7 +297,7 @@ export function ToolOverlay({
                   ×
                 </Button>
               )}
-            </div>
+            </motion.div>
             {showContextGauge && (
               <div
                 style={{

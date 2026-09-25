@@ -9,11 +9,11 @@ import {
   ZOOM_SCROLL_THRESHOLD,
 } from '../../constants.js';
 import { unlockAudio } from '../../notificationSound.js';
-import { transport } from '../../transport/index.js';
 import { getColorizedSprite } from '../colorize.js';
 import { canPlaceFurniture, getWallPlacementRow } from '../editor/editorActions.js';
 import type { EditorState } from '../editor/editorState.js';
 import { startGameLoop } from '../engine/gameLoop.js';
+import { applyOfficeClick } from '../engine/officeClick.js';
 import type { OfficeState } from '../engine/officeState.js';
 import type {
   DeleteButtonBounds,
@@ -723,70 +723,16 @@ export function OfficeCanvas({
       const pos = screenToWorld(e.clientX, e.clientY);
       if (!pos) return;
 
-      const hitId = officeState.getCharacterAt(pos.worldX, pos.worldY);
-      if (hitId !== null) {
-        // Dismiss any active bubble on click
-        officeState.dismissBubble(hitId);
-        // Toggle selection: click same agent deselects, different agent selects
-        if (officeState.selectedAgentId === hitId) {
-          officeState.selectedAgentId = null;
-          officeState.cameraFollowId = null;
-        } else {
-          officeState.selectedAgentId = hitId;
-          officeState.cameraFollowId = hitId;
-        }
-        onClick(hitId); // still focus terminal
-        return;
-      }
-
-      // Pet hit: toggle the heart bubble.
-      const petId = officeState.getPetAt(pos.worldX, pos.worldY);
-      if (petId !== null) {
-        const pet = officeState.pets.find((p) => p.id === petId);
-        if (pet?.bubbleType) {
-          officeState.dismissPetBubble(petId);
-        } else {
-          officeState.showPetBubble(petId);
-        }
-        return;
-      }
-
-      // No agent hit — check seat click while agent is selected
-      if (officeState.selectedAgentId !== null) {
-        const selectedCh = officeState.characters.get(officeState.selectedAgentId);
-        // Skip seat reassignment for sub-agents
-        if (selectedCh && !selectedCh.isSubagent) {
-          const tile = screenToTile(e.clientX, e.clientY);
-          if (tile) {
-            const seatId = officeState.getSeatAtTile(tile.col, tile.row);
-            if (seatId) {
-              const seat = officeState.seats.get(seatId);
-              if (seat && selectedCh) {
-                if (selectedCh.seatId === seatId) {
-                  // Clicked own seat — send agent back to it
-                  officeState.sendToSeat(officeState.selectedAgentId);
-                  officeState.selectedAgentId = null;
-                  officeState.cameraFollowId = null;
-                  return;
-                } else if (!seat.assigned) {
-                  // Clicked available seat — reassign
-                  officeState.reassignSeat(officeState.selectedAgentId, seatId);
-                  officeState.selectedAgentId = null;
-                  officeState.cameraFollowId = null;
-                  transport.send({
-                    type: 'saveAgentSeats',
-                    seats: officeState.getPersistableSeats(),
-                  });
-                  return;
-                }
-              }
-            }
-          }
-        }
-        // Clicked empty space — deselect
-        officeState.selectedAgentId = null;
-        officeState.cameraFollowId = null;
-      }
+      const agentId = officeState.getCharacterAt(pos.worldX, pos.worldY);
+      applyOfficeClick(
+        officeState,
+        {
+          agentId,
+          petId: agentId === null ? officeState.getPetAt(pos.worldX, pos.worldY) : null,
+          getTile: () => screenToTile(e.clientX, e.clientY),
+        },
+        onClick,
+      );
     },
     [officeState, onClick, screenToWorld, screenToTile, isEditMode],
   );

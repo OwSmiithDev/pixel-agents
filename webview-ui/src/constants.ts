@@ -312,3 +312,49 @@ export const PET_THUMB_SCALE_MARGIN = 0.85;
 export const EMPTY_SPRITE_THUMBNAIL_BG = '#333';
 /** Maximum string length for a PlacedPet.id (defends against pathologically-long layout entries). */
 export const MAX_PET_ID_LENGTH = 128;
+
+// ── Three.js renderer (3D view) ──────────────────────────────
+/** Camera tilt below the horizon. Higher = closer to the 2D top-down look. */
+export const THREE_CAMERA_PITCH_DEG = 52;
+/**
+ * Camera rotation around the vertical axis. The stock art is 3/4 front view,
+ * so large yaw (e.g. 45°) visually detaches multi-tile furniture from its
+ * floor footprint. Keep it small unless the art is redrawn.
+ */
+export const THREE_CAMERA_YAW_DEG = 0;
+/** Distance from the look-at target (world units); only affects clipping. */
+export const THREE_CAMERA_DISTANCE = 120;
+export const THREE_BG_COLOR = '#0B0F14';
+export const THREE_AMBIENT_COLOR = '#DCE6F2';
+export const THREE_AMBIENT_INTENSITY = 0.5;
+export const THREE_KEY_LIGHT_COLOR = '#FFFFFF';
+export const THREE_KEY_LIGHT_INTENSITY = 0.75;
+/** Key light direction relative to the map center (world units). */
+export const THREE_KEY_LIGHT_OFFSET = { x: -24, y: 30, z: -16 } as const;
+export const THREE_SHADOW_MAP_SIZE = 2048;
+/** Brand accent: floor light strips, selection glow. */
+export const THREE_ACCENT_COLOR = '#2EC4D6';
+/** Floor tiles whose colorize hue falls in this range (and saturation ≥ min) glow. */
+export const THREE_GLOW_HUE_MIN = 180;
+export const THREE_GLOW_HUE_MAX = 195;
+export const THREE_GLOW_SAT_MIN = 50;
+export const THREE_GLOW_INTENSITY = 0.4;
+export const THREE_GLOW_PULSE_AMPLITUDE = 0.15;
+export const THREE_GLOW_PULSE_SPEED = 1.6;
+export const THREE_SELECTED_EMISSIVE = 0.45;
+export const THREE_HOVERED_EMISSIVE = 0.22;
+export const THREE_BLOOM_THRESHOLD = 0.85;
+export const THREE_BLOOM_INTENSITY = 0.85;
+export const THREE_BLOOM_RADIUS = 0.55;
+export const THREE_VIGNETTE_DARKNESS = 0.55;
+/** Alpha cutoff for sprite planes (pixel art is binary alpha). */
+export const THREE_ALPHA_TEST = 0.5;
+/** Render order that keeps speech bubbles above everything else. */
+export const THREE_BUBBLE_RENDER_ORDER = 10;
+/** localStorage key for the persisted 2D/3D choice. */
+export const VIEW_MODE_STORAGE_KEY = 'pixel-agents.viewMode';
+export const THREE_MONITOR_LIGHT_INTENSITY = 2.2;
+export const THREE_MONITOR_LIGHT_DISTANCE = 3.5;
+export const THREE_MONITOR_LIGHT_HEIGHT = 1.2;
+/** Upper bound on per-monitor point lights (each one costs shader work). */
+export const THREE_MONITOR_LIGHT_MAX = 12;

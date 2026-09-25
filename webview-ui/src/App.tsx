@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { toMajorMinor } from './changelogData.js';
 import { BottomToolbar } from './components/BottomToolbar.js';
@@ -12,6 +12,7 @@ import { SettingsModal } from './components/SettingsModal.js';
 import { Tooltip } from './components/Tooltip.js';
 import { Modal } from './components/ui/Modal.js';
 import { VersionIndicator } from './components/VersionIndicator.js';
+import { ViewToggle } from './components/ViewToggle.js';
 import { ZoomControls } from './components/ZoomControls.js';
 import { useEditorActions } from './hooks/useEditorActions.js';
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
@@ -26,10 +27,12 @@ import { exportLayoutToFile } from './office/layout/exportLayout.js';
 import { isRotatable } from './office/layout/furnitureCatalog.js';
 import { migrateLayoutColors } from './office/layout/layoutSerializer.js';
 import { getPetCount } from './office/sprites/petSpriteData.js';
+import type { ScreenProjector } from './office/three/Office3D.js';
 import { EditTool, type OfficeLayout } from './office/types.js';
 import { isBrowserRuntime, isE2E } from './runtime.js';
 import { installTestHooks } from './testHooks.js';
 import { transport } from './transport/index.js';
+import { readStoredViewMode, storeViewMode, type ViewMode } from './viewMode.js';
 
 // Game state lives outside React — updated imperatively by message handlers
 const officeStateRef = { current: null as OfficeState | null };
@@ -39,6 +42,11 @@ const editorState = new EditorState();
 // Installed only under the e2e harness so they never patch prototypes or grow
 // unbounded logs in a real user's session.
 if (isE2E) installTestHooks(officeStateRef);
+
+// Three.js is only downloaded when the 3D view is first opened.
+const Office3D = lazy(() =>
+  import('./office/three/Office3D.js').then((m) => ({ default: m.Office3D })),
+);
 
 function getOfficeState(): OfficeState {
   if (!officeStateRef.current) {
@@ -60,6 +68,13 @@ function App() {
   }, []);
 
   const editor = useEditorActions(getOfficeState, editorState);
+
+  const [viewMode, setViewMode] = useState<ViewMode>(readStoredViewMode);
+  const projector3dRef = useRef<ScreenProjector | null>(null);
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    storeViewMode(mode);
+  }, []);
 
   const isEditDirty = useCallback(
     () => editor.isEditMode && editor.isDirty,
@@ -327,34 +342,64 @@ function App() {
       return false;
     })();
 
+  // The layout editor and the intro tour are 2D-only (they hit-test and anchor
+  // on the canvas projection), so 3D yields to them while they are open.
+  const view3dLockedReason = editor.isEditMode
+    ? '3D is unavailable while editing the layout'
+    : intro
+      ? '3D is available after the intro'
+      : null;
+  const show3d = viewMode === '3d' && view3dLockedReason === null;
+
   if (!layoutReady) {
     return <div className="w-full h-full flex items-center justify-center ">Loading...</div>;
   }
 
   return (
     <div ref={containerRef} className="w-full h-full relative overflow-hidden">
-      <OfficeCanvas
-        officeState={officeState}
-        onClick={handleClick}
-        isEditMode={editor.isEditMode}
-        editorState={editorState}
-        onEditorTileAction={editor.handleEditorTileAction}
-        onEditorEraseAction={editor.handleEditorEraseAction}
-        onEditorSelectionChange={editor.handleEditorSelectionChange}
-        onDeleteSelected={editor.handleDeleteSelected}
-        onRotateSelected={editor.handleRotateSelected}
-        onDragMove={editor.handleDragMove}
-        editorTick={editor.editorTick}
-        zoom={editor.zoom}
-        onZoomChange={editor.handleZoomChange}
-        panRef={editor.panRef}
-        showAreas={effectiveShowAreas}
-        activeAreaLabel={activeAreaLabel}
-      />
+      {show3d ? (
+        <Suspense
+          fallback={
+            <div className="w-full h-full flex items-center justify-center">Loading 3D…</div>
+          }
+        >
+          <Office3D
+            officeState={officeState}
+            zoom={editor.zoom}
+            onZoomChange={editor.handleZoomChange}
+            onAgentClick={handleClick}
+            projectorRef={projector3dRef}
+          />
+        </Suspense>
+      ) : (
+        <OfficeCanvas
+          officeState={officeState}
+          onClick={handleClick}
+          isEditMode={editor.isEditMode}
+          editorState={editorState}
+          onEditorTileAction={editor.handleEditorTileAction}
+          onEditorEraseAction={editor.handleEditorEraseAction}
+          onEditorSelectionChange={editor.handleEditorSelectionChange}
+          onDeleteSelected={editor.handleDeleteSelected}
+          onRotateSelected={editor.handleRotateSelected}
+          onDragMove={editor.handleDragMove}
+          editorTick={editor.editorTick}
+          zoom={editor.zoom}
+          onZoomChange={editor.handleZoomChange}
+          panRef={editor.panRef}
+          showAreas={effectiveShowAreas}
+          activeAreaLabel={activeAreaLabel}
+        />
+      )}
 
       {!isDebugMode ? (
         <>
           <ZoomControls zoom={editor.zoom} onZoomChange={editor.handleZoomChange} />
+          <ViewToggle
+            mode={show3d ? '3d' : '2d'}
+            onChange={handleViewModeChange}
+            lockedReason={view3dLockedReason}
+          />
 
           {/* Vignette overlay */}
           <div
@@ -436,6 +481,11 @@ function App() {
             panRef={editor.panRef}
             onCloseAgent={handleCloseAgent}
             alwaysShowOverlay={alwaysShowOverlay}
+            anchorToScreen={
+              show3d
+                ? (x, groundY, lift) => projector3dRef.current?.(x, groundY, lift) ?? null
+                : undefined
+            }
           />
         </>
       ) : (
