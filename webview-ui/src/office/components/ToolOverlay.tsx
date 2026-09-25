@@ -260,7 +260,7 @@ export function ToolOverlay({
             <>
               {dot}
               <span
-                className={`${line} text-2xs max-w-220`}
+                className={`${line} text-2xs max-w-[22ch]`}
                 style={{ fontStyle: isSub ? 'italic' : undefined }}
                 title={text}
               >

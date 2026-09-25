@@ -69,7 +69,7 @@ export function OverflowBadge({
     // Above the bottom toolbar on narrow screens; bottom-center once there is room.
     <div
       ref={rootRef}
-      className="absolute bottom-68 xl:bottom-10 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-4"
+      className="absolute bottom-80 xl:bottom-10 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4"
       data-testid="overflow-badge"
     >
       {open && (
