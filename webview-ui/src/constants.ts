@@ -326,9 +326,14 @@ export const THREE_CAMERA_YAW_DEG = 0;
 export const THREE_CAMERA_DISTANCE = 120;
 export const THREE_BG_COLOR = '#0B0F14';
 export const THREE_AMBIENT_COLOR = '#DCE6F2';
-export const THREE_AMBIENT_INTENSITY = 0.5;
+/**
+ * Light levels as a fraction of the original 2D brightness (1 = same as 2D).
+ * Three.js divides diffuse light by π, so Office3D multiplies these by π.
+ * Floor in light ≈ ambient + key·0.72 ≈ 1.0; floor in shadow ≈ ambient.
+ */
+export const THREE_AMBIENT_INTENSITY = 0.65;
 export const THREE_KEY_LIGHT_COLOR = '#FFFFFF';
-export const THREE_KEY_LIGHT_INTENSITY = 0.75;
+export const THREE_KEY_LIGHT_INTENSITY = 0.5;
 /** Key light direction relative to the map center (world units). */
 export const THREE_KEY_LIGHT_OFFSET = { x: -24, y: 30, z: -16 } as const;
 export const THREE_SHADOW_MAP_SIZE = 2048;
@@ -343,10 +348,11 @@ export const THREE_GLOW_PULSE_AMPLITUDE = 0.15;
 export const THREE_GLOW_PULSE_SPEED = 1.6;
 export const THREE_SELECTED_EMISSIVE = 0.45;
 export const THREE_HOVERED_EMISSIVE = 0.22;
-export const THREE_BLOOM_THRESHOLD = 0.85;
+/** Only overbright pixels (accent glow, lit monitors) bloom; base art tops out at 1.0. */
+export const THREE_BLOOM_THRESHOLD = 1.0;
 export const THREE_BLOOM_INTENSITY = 0.85;
 export const THREE_BLOOM_RADIUS = 0.55;
-export const THREE_VIGNETTE_DARKNESS = 0.55;
+export const THREE_VIGNETTE_DARKNESS = 0.3;
 /** Alpha cutoff for sprite planes (pixel art is binary alpha). */
 export const THREE_ALPHA_TEST = 0.5;
 /** Render order that keeps speech bubbles above everything else. */

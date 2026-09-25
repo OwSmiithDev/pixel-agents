@@ -141,7 +141,7 @@ function KeyLight({ officeState }: { officeState: OfficeState }) {
     <directionalLight
       ref={light}
       color={THREE_KEY_LIGHT_COLOR}
-      intensity={THREE_KEY_LIGHT_INTENSITY}
+      intensity={THREE_KEY_LIGHT_INTENSITY * Math.PI}
       position={[
         cx + THREE_KEY_LIGHT_OFFSET.x,
         THREE_KEY_LIGHT_OFFSET.y,
@@ -345,7 +345,7 @@ export function Office3D({
           up={up}
           projectorRef={projectorRef}
         />
-        <ambientLight color={THREE_AMBIENT_COLOR} intensity={THREE_AMBIENT_INTENSITY} />
+        <ambientLight color={THREE_AMBIENT_COLOR} intensity={THREE_AMBIENT_INTENSITY * Math.PI} />
         <KeyLight officeState={officeState} />
         <MonitorLights officeState={officeState} />
         <FloorLayer officeState={officeState} reducedMotion={reducedMotion} />

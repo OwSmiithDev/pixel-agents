@@ -106,6 +106,12 @@ layout stays editable as code; output committed as
   the view ray; this keeps them visible.
 - **Key light comes from behind-left** so shadows fall toward the viewer; a
   front light hides every shadow behind its own sprite.
+- **Brightness matches 2D**: light constants are fractions of the 2D
+  brightness and are multiplied by π in `Office3D` (Three.js divides diffuse
+  light by π). Sprites face the camera and never get the key light, so they
+  carry an emissive fill with their own texture (`1 − ambient`). Bloom only
+  catches overbright pixels (threshold 1.0). Verified by sampling pixels: 3D
+  within ~10% of 2D.
 - **Monitor light pools**: `MonitorLights.tsx` adds capped accent point lights
   under monitors placed "on" (the NOC), making it the focal room.
 - **3D is lazy-loaded** (`React.lazy`): ~270 kB gzip, downloaded only when 3D

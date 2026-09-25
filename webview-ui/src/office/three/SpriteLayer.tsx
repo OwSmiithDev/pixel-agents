@@ -11,6 +11,7 @@ import {
   HEADLESS_CHARACTER_ALPHA,
   THREE_ACCENT_COLOR,
   THREE_ALPHA_TEST,
+  THREE_AMBIENT_INTENSITY,
   THREE_BUBBLE_RENDER_ORDER,
   THREE_HOVERED_EMISSIVE,
   THREE_SELECTED_EMISSIVE,
@@ -55,13 +56,20 @@ interface PooledSprite {
 // Unit quad anchored at its bottom-center, so scale = sprite size in world units.
 const quad = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
 const accent = new THREE.Color(THREE_ACCENT_COLOR);
+const white = new THREE.Color(1, 1, 1);
+/**
+ * Sprites face the camera, so the key light (behind) never reaches their front.
+ * An emissive fill with the sprite's own texture tops ambient up to 1.0, so the
+ * art keeps its 2D brightness while monitor lights still add on top.
+ */
+const SPRITE_FILL = Math.max(0, 1 - THREE_AMBIENT_INTENSITY);
 
 function createPooledSprite(): PooledSprite {
   const material = new THREE.MeshLambertMaterial({
     alphaTest: THREE_ALPHA_TEST,
     side: THREE.DoubleSide,
-    emissive: accent,
-    emissiveIntensity: 0,
+    emissive: white.clone(),
+    emissiveIntensity: SPRITE_FILL,
   });
   const depth = new THREE.MeshDepthMaterial({
     depthPacking: THREE.RGBADepthPacking,
@@ -196,6 +204,7 @@ export function SpriteLayer({ officeState, basis, pickablesRef }: SpriteLayerPro
       const material = mesh.material;
       if (material.map !== texture) {
         material.map = texture;
+        material.emissiveMap = texture;
         depth.map = texture;
         material.needsUpdate = true;
         depth.needsUpdate = true;
@@ -203,7 +212,10 @@ export function SpriteLayer({ officeState, basis, pickablesRef }: SpriteLayerPro
       const alpha = d.alpha ?? 1;
       material.transparent = alpha < 1;
       material.opacity = alpha;
-      material.emissiveIntensity = d.emissive ?? 0;
+      // Selection/hover: white fill + accent on top (emissive = fill·white + e·accent).
+      const extra = d.emissive ?? 0;
+      material.emissive.copy(white).lerp(accent, extra / (SPRITE_FILL + extra || 1));
+      material.emissiveIntensity = SPRITE_FILL + extra;
       material.depthTest = !d.bubble;
       mesh.renderOrder = d.bubble ? THREE_BUBBLE_RENDER_ORDER : 0;
       mesh.castShadow = !d.bubble;
