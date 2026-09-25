@@ -42,8 +42,18 @@ export function hooksConsentRequest(
 ): HooksConsentRequest | null {
   if (!state.hooksEnabled || !state.privileged) return null;
   if (!state.reconsent && (state.installed || state.consentAnswered)) return null;
-  const { headline, disclosure } = provider.consentDisclosure();
-  return { type: 'hooksConsentRequest', providerId: provider.id, headline, disclosure };
+  // A re-ask is about the added scope only (the prompt hook), so it carries its
+  // own copy and flag: the first-run text ("adds hooks for N events", "Don't
+  // Ask Again") would misstate what its answers do to the hooks already there.
+  const reconsent = state.reconsent === true && (state.installed || state.consentAnswered);
+  const { headline, disclosure } = provider.consentDisclosure({ reconsent });
+  return {
+    type: 'hooksConsentRequest',
+    providerId: provider.id,
+    headline,
+    disclosure,
+    ...(reconsent ? { reconsent: true } : {}),
+  };
 }
 
 /** What the server should DO about an answer. The Intro lets the user walk BACK from the closing step and re-answer,

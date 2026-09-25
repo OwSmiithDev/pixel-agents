@@ -634,6 +634,7 @@ function App() {
           officeState={officeState}
           headline={intro.headline}
           disclosure={intro.disclosure}
+          reconsent={intro.reconsent === true}
           containerRef={containerRef}
           zoom={editor.zoom}
           panRef={editor.panRef}

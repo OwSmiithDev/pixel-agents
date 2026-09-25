@@ -4,6 +4,8 @@ import {
   CONSENT_DISCLOSURE,
   CONSENT_EVENT_COUNT,
   CONSENT_INSTALL_HEADLINE,
+  RECONSENT_DISCLOSURE,
+  RECONSENT_HEADLINE,
 } from '../src/providers/hook/claude/consentCopy.js';
 import {
   CLAUDE_HOOK_EVENTS,
@@ -67,5 +69,28 @@ describe('consent copy', () => {
   // would be a silent legibility regression.
   it('is a paragraph-separated block', () => {
     expect(CONSENT_DISCLOSURE.split('\n\n')).toHaveLength(3);
+  });
+});
+
+describe('re-consent copy (prompt hook only)', () => {
+  it('names the prompt hook and exactly what is sent, kept and shown', () => {
+    expect(RECONSENT_DISCLOSURE).toContain('UserPromptSubmit');
+    expect(RECONSENT_DISCLOSURE).toContain('every prompt you submit');
+    expect(RECONSENT_DISCLOSURE).toContain('127.0.0.1');
+    expect(RECONSENT_DISCLOSURE).toContain('at most 60 characters');
+    expect(RECONSENT_DISCLOSURE).toContain('never stores, logs or forwards the prompt');
+  });
+
+  it('says existing hooks stay and what each re-ask button does', () => {
+    expect(RECONSENT_DISCLOSURE).toContain('existing hooks stay exactly as they are');
+    expect(RECONSENT_DISCLOSURE).toContain('"Keep Titles Off"');
+    expect(RECONSENT_DISCLOSURE).toContain('"Not Now"');
+    expect(RECONSENT_DISCLOSURE).toContain('Settings → Instant Detection (Hooks)');
+  });
+
+  it('never reuses the first-run install wording', () => {
+    expect(RECONSENT_HEADLINE).not.toBe(CONSENT_INSTALL_HEADLINE);
+    expect(RECONSENT_DISCLOSURE).not.toMatch(/adds hooks for \d+/);
+    expect(RECONSENT_DISCLOSURE.split('\n\n')).toHaveLength(3);
   });
 });

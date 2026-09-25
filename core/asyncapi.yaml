@@ -754,6 +754,15 @@ components:
             The hook provider whose install is being approved (HookProvider.id).
             The client never originates this value — it echoes it back in its
             `hooksConsentResponse`.
+        reconsent:
+          type: boolean
+          description: >-
+            True when this is a RE-ask of a user whose hooks are already
+            installed under an older consent: it concerns only the added scope
+            (the prompt hook for task titles), so the client opens directly at
+            the consent step and labels the answers for that scope
+            (install = enable task titles, never = keep titles off). The 12
+            existing hooks are unaffected by any answer. Absent = first-run ask.
         headline:
           type: string
           description: One-sentence summary of what is being approved.

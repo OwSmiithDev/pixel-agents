@@ -299,6 +299,7 @@ export interface HooksStatus {
 export interface HooksConsentRequest {
   type: 'hooksConsentRequest';
   providerId: string;
+  reconsent?: boolean;
   headline: string;
   disclosure: string;
 }

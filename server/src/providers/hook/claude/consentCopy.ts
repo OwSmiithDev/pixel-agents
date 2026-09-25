@@ -55,6 +55,35 @@ export const CONSENT_FACT_REVERSIBLE =
  *  disclosure facts by design: the facts all live in CONSENT_DISCLOSURE. */
 export const CONSENT_INSTALL_HEADLINE = 'One more thing: hooks!';
 
+// ── Re-consent (a grant older than HOOKS_CONSENT_VERSION) ──
+// Asked ONLY of users whose hooks are already installed under an older grant.
+// Every answer concerns the prompt hook alone, so the copy says exactly that
+// and never reads as the first-run install (the webview relabels the buttons:
+// Enable Task Titles / Not Now / Keep Titles Off).
+
+export const RECONSENT_HEADLINE = 'New: task titles from your prompts';
+
+export const RECONSENT_FACT_WHAT =
+  'Pixel Agents can now show what each agent is working on. For that it adds ONE more Claude Code ' +
+  `hook (UserPromptSubmit) to ${SETTINGS_FILE}, next to the hooks you already have.`;
+
+export const RECONSENT_FACT_DATA =
+  'With it, Claude Code sends every prompt you submit to the Pixel Agents server on this machine ' +
+  '(it listens only on 127.0.0.1 unless you started it with --host). The server immediately reduces ' +
+  'the prompt to a short task title of at most 60 characters and never stores, logs or forwards the ' +
+  'prompt itself. The title is shown in the office.';
+
+export const RECONSENT_FACT_CHOICES =
+  'Your existing hooks stay exactly as they are whatever you choose. "Keep Titles Off" stops this ' +
+  'question and never adds the hook; "Not Now" asks again next time. ' +
+  CONSENT_FACT_REVERSIBLE;
+
+export const RECONSENT_DISCLOSURE = [
+  RECONSENT_FACT_WHAT,
+  RECONSENT_FACT_DATA,
+  RECONSENT_FACT_CHOICES,
+].join('\n\n');
+
 /** The three disclosure facts, in order, as one block.
  *
  *  This is the consent step's body. The IntroBubble splits it on the blank

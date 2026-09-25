@@ -698,6 +698,7 @@ export function useExtensionMessages(
             providerId: msg.providerId as string,
             headline: msg.headline as string,
             disclosure: msg.disclosure as string,
+            ...(msg.reconsent === true ? { reconsent: true } : {}),
           };
           setConsentQueue((q) => {
             const i = q.findIndex((r) => r.providerId === request.providerId);

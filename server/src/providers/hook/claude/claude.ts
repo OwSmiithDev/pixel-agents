@@ -16,7 +16,12 @@ import {
   uninstallHooks as installerUninstallHooks,
 } from './claudeHookInstaller.js';
 import { claudeTeamProvider } from './claudeTeamProvider.js';
-import { CONSENT_DISCLOSURE, CONSENT_INSTALL_HEADLINE } from './consentCopy.js';
+import {
+  CONSENT_DISCLOSURE,
+  CONSENT_INSTALL_HEADLINE,
+  RECONSENT_DISCLOSURE,
+  RECONSENT_HEADLINE,
+} from './consentCopy.js';
 import {
   CLAUDE_LARGE_CONTEXT_WINDOW,
   CLAUDE_PROMPT_HOOK_EVENT,
@@ -310,7 +315,11 @@ function areHooksInstalled(): Promise<boolean> {
 /** This provider's first-run consent terms. The strings live in
  *  consentCopy.ts (Claude-specific facts: the event count, the settings
  *  path); the shared consent gate ships them verbatim to the Intro. */
-function consentDisclosure(): { headline: string; disclosure: string } {
+function consentDisclosure(opts?: { reconsent?: boolean }): {
+  headline: string;
+  disclosure: string;
+} {
+  if (opts?.reconsent) return { headline: RECONSENT_HEADLINE, disclosure: RECONSENT_DISCLOSURE };
   return { headline: CONSENT_INSTALL_HEADLINE, disclosure: CONSENT_DISCLOSURE };
 }
 

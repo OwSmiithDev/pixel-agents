@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   CONSENT_DISCLOSURE,
   CONSENT_INSTALL_HEADLINE,
+  RECONSENT_DISCLOSURE,
+  RECONSENT_HEADLINE,
 } from '../src/providers/hook/claude/consentCopy.js';
 import { consentActionFor, hooksConsentRequest } from '../src/providers/hook/consentGate.js';
 import { claudeProvider } from '../src/providers/index.js';
@@ -28,6 +30,24 @@ describe('hooksConsentRequest — when to ask', () => {
       headline: CONSENT_INSTALL_HEADLINE,
       disclosure: CONSENT_DISCLOSURE,
     });
+  });
+
+  it('a re-ask (older grant, hooks installed) carries the re-consent copy and flag', () => {
+    const request = hooksConsentRequest(
+      { ...askable, installed: true, consentAnswered: true, reconsent: true },
+      claudeProvider,
+    );
+    expect(request).toEqual({
+      type: 'hooksConsentRequest',
+      providerId: 'claude',
+      headline: RECONSENT_HEADLINE,
+      disclosure: RECONSENT_DISCLOSURE,
+      reconsent: true,
+    });
+  });
+
+  it('the first-run ask never carries the re-consent flag', () => {
+    expect(hooksConsentRequest(askable, claudeProvider)).not.toHaveProperty('reconsent');
   });
 
   // The payload carries the provider's copy so the webview renders the exact

@@ -12,6 +12,7 @@ import type { ConsentChoice } from '../hooks/introTourState.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import { DiscordIcon } from './ChangelogModal.js';
 import { computeIntroBubbleGeometry } from './introBubbleGeometry.js';
+import { consentStepLabels } from './introConsentLabels.js';
 import { Button } from './ui/Button.js';
 
 interface IntroBubbleProps {
@@ -23,6 +24,10 @@ interface IntroBubbleProps {
    *  terms, only orientation. */
   headline: string;
   disclosure: string;
+  /** A re-ask of an existing user about the prompt hook only: the tour opens
+   *  AT the consent step (no welcome tour, no Back past it) and the buttons
+   *  say what they do to that one scope. */
+  reconsent: boolean;
   containerRef: React.RefObject<HTMLDivElement | null>;
   zoom: number;
   panRef: React.RefObject<{ x: number; y: number }>;
@@ -97,6 +102,7 @@ export function IntroBubble({
   officeState,
   headline,
   disclosure,
+  reconsent,
   containerRef,
   zoom,
   panRef,
@@ -108,7 +114,9 @@ export function IntroBubble({
 }: IntroBubbleProps) {
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [, setTick] = useState(0);
-  const [step, setStep] = useState(WELCOME_STEP);
+  const firstStep = reconsent ? CONSENT_STEP : WELCOME_STEP;
+  const labels = consentStepLabels(reconsent);
+  const [step, setStep] = useState(firstStep);
 
   // The greeter lives exactly as long as this component.
   useEffect(() => {
@@ -206,7 +214,7 @@ export function IntroBubble({
     wrapperStyle = { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' };
   }
 
-  const back = (): void => setStep((s) => Math.max(WELCOME_STEP, s - 1));
+  const back = (): void => setStep((s) => Math.max(firstStep, s - 1));
   const forward = (): void => setStep((s) => Math.min(CLOSING_STEP, s + 1));
   const choose = (choice: ConsentChoice): void => {
     onChoice(choice);
@@ -220,7 +228,7 @@ export function IntroBubble({
     'Welcome to Pixel Agents!',
     'Powered by Claude Code',
     headline,
-    installFailed ? "Hooks couldn't be installed" : "You're all set!",
+    installFailed ? labels.failedTitle : "You're all set!",
   ];
 
   return (
@@ -320,7 +328,12 @@ export function IntroBubble({
 
         {step === CLOSING_STEP && (
           <>
-            {installFailed ? (
+            {installFailed && reconsent ? (
+              <p className="text-sm m-0 mb-8">
+                Something went wrong writing to your Claude Code settings, so task titles were not
+                enabled. Your existing hooks are unchanged and the office keeps working as before.
+              </p>
+            ) : installFailed ? (
               <p className="text-sm m-0 mb-8">
                 Something went wrong writing to your Claude Code settings, so the office will watch
                 your sessions the slower way instead. No worries, everything still works and you can
@@ -348,7 +361,7 @@ export function IntroBubble({
         <div className="flex items-center justify-between gap-6 mt-10 flex-wrap">
           {/* Left slot: Back everywhere it can go back; a spacer on the opening
               step keeps the right-side buttons in place. */}
-          {step === WELCOME_STEP ? (
+          {step === firstStep ? (
             <span />
           ) : (
             <Button
@@ -371,7 +384,7 @@ export function IntroBubble({
                 className={installPending ? 'opacity-[var(--btn-disabled-opacity)]' : ''}
                 onClick={() => choose('never')}
               >
-                Don't Ask Again
+                {labels.never}
               </Button>
               <Button
                 variant={installPending ? 'disabled' : 'default'}
@@ -379,7 +392,7 @@ export function IntroBubble({
                 disabled={installPending}
                 onClick={() => choose('notNow')}
               >
-                Not Now
+                {labels.notNow}
               </Button>
               <Button
                 variant={installPending ? 'disabled' : 'accent'}
@@ -387,7 +400,7 @@ export function IntroBubble({
                 disabled={installPending}
                 onClick={() => choose('install')}
               >
-                {installPending ? 'Installing...' : 'Install Hooks'}
+                {installPending ? labels.installPending : labels.install}
               </Button>
             </div>
           ) : step === CLOSING_STEP ? (

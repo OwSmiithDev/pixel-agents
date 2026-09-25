@@ -480,6 +480,13 @@ test.describe('Hooks consent gate / pre-consent install', () => {
     // The legacy grant does not cover prompts, so the ask is raised again.
     narrator.step('checking for the re-consent dialog');
     await expect(consentDialog(frame)).toHaveCount(1, { timeout: 15_000 });
+    // The re-ask variant: opens at the consent step, scoped labels, no install wording.
+    await expect(
+      consentDialog(frame).getByRole('button', { name: 'Enable Task Titles' }),
+    ).toBeVisible();
+    await expect(consentDialog(frame).getByRole('button', { name: 'Install Hooks' })).toHaveCount(
+      0,
+    );
     narrator.check('re-consent dialog raised for the prompt hook');
 
     // Migrated hooks are live, and the checkbox says so.
