@@ -51,9 +51,12 @@ function tileOf(c: Character): string {
   return `${c.tileCol},${c.tileRow}`;
 }
 
-/** Fill every auto-assignable work seat with agents 1..9 (no spawn effect). */
+/** IDE agent (IDE_ID, created first → work-ide) plus agents 1..9 filling
+ *  every other work seat (no spawn effect). The office is then full. */
+const IDE_ID = 100;
 function fullOffice(): OfficeState {
   const os = new OfficeState(userLayout());
+  os.addAgent(IDE_ID, 0, 0, undefined, true);
   for (let id = 1; id <= 9; id++) os.addAgent(id, 0, 0, undefined, true);
   return os;
 }
@@ -93,6 +96,7 @@ describe('seat classification', () => {
       work.add(c.seatId!);
       rest.add(c.restSeatId!);
     }
+    assert.equal(ch(os, IDE_ID).seatId, 'work-ide', 'the IDE agent sits in the IDE area');
     assert.equal(work.size, 9, 'distinct work seats');
     assert.equal(rest.size, 9, 'distinct rest seats');
   });
@@ -112,6 +116,8 @@ describe('seat classification', () => {
 
   test('findFreeWorkSeat can opt into IDE seats (hook for the IDE role)', () => {
     const os = fullOffice();
+    os.removeAgent(IDE_ID);
+    step(os, MATRIX_EFFECT_DURATION_SEC + 0.1);
     assert.equal(os.findFreeWorkSeat(), null);
     assert.equal(os.findFreeWorkSeat({ allowIde: true }), 'work-ide');
   });
@@ -125,7 +131,8 @@ describe('overflow', () => {
     assert.equal(os.characters.has(10), false);
     assert.equal(os.characters.has(11), false);
     assert.deepEqual(os.getOverflowAgentIds(), [10, 11]);
-    for (const c of os.characters.values()) assert.ok(AUTO_WORK.includes(c.seatId!));
+    for (const c of os.characters.values())
+      assert.ok(c.id === IDE_ID || AUTO_WORK.includes(c.seatId!));
   });
 
   test('freed work seat promotes the oldest overflow agent with its data', () => {
@@ -372,7 +379,7 @@ describe('restore', () => {
     const os = new OfficeState(userLayout());
     os.addAgent(1, 0, 0, 'rest-armchair', true, undefined, undefined, 'work-agent-02');
     const c = ch(os, 1);
-    assert.ok(AUTO_WORK.includes(c.seatId!), `work seat ${c.seatId}`);
+    assert.ok(os.isWorkSeat(c.seatId!), `work seat ${c.seatId}`);
     assert.ok(c.restSeatId && !os.isWorkSeat(c.restSeatId), `rest seat ${c.restSeatId}`);
   });
 

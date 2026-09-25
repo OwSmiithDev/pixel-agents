@@ -46,6 +46,12 @@ import { advanceMatrixEffect, startMatrixEffect } from './matrixEffectState.js';
 import { createPet, updatePet } from './petEntity.js';
 import { anchorTile, closestFreeSeat } from './seatPlacement.js';
 
+/** Team metadata (agentTeamInfo / teammate agentCreated), kept across overflow. */
+type TeamInfo = Pick<
+  Character,
+  'teamName' | 'agentName' | 'isTeamLead' | 'leadAgentId' | 'teamUsesTmux'
+>;
+
 /** An agent (or sub-agent) waiting for a free work seat. No character exists for it. */
 interface OverflowEntry {
   id: number;
@@ -59,6 +65,7 @@ interface OverflowEntry {
   parentAgentId?: number;
   isActive: boolean;
   isHeadless: boolean;
+  team?: TeamInfo;
 }
 
 /** One agent's entry in the `saveAgentSeats` payload. */
@@ -111,6 +118,10 @@ export class OfficeState {
   private overflow: OverflowEntry[] = [];
   /** Seats facing electronics. Every other seat is a rest seat. */
   private workSeatIds = new Set<string>();
+  /** The IDE role: first top-level agent created; on close, the lowest live id. */
+  private ideAgentId: number | null = null;
+  /** Non-IDE top-level agent → its `Agente NN` number (lowest free number reused). */
+  private agentNumbers = new Map<number, number>();
 
   /**
    * folderName → list of Area labels that workspace folder belongs to.
@@ -212,7 +223,9 @@ export class OfficeState {
             ? anchorTile(this.characters.get(ch.parentAgentId), this.seats)
             : undefined;
         ch.seatId = this.claimSeat(
-          this.findFreeWorkSeat(near ? { near } : { folderName: ch.folderName }),
+          this.findFreeWorkSeat(
+            near ? { near } : { folderName: ch.folderName, allowIde: this.isIdeAgent(ch.id) },
+          ),
           true,
         );
       }
@@ -308,6 +321,7 @@ export class OfficeState {
     // No PC-facing seat at all: every seat is a work seat (no rest seats), so
     // agents still appear on layouts without electronics.
     if (this.workSeatIds.size === 0) this.workSeatIds = new Set(this.seats.keys());
+    for (const seat of this.seats.values()) seat.isWork = this.workSeatIds.has(seat.uid);
   }
 
   /** Work seat = a seat facing electronics (PC, monitor). Every other seat is a
@@ -332,7 +346,7 @@ export class OfficeState {
 
   /**
    * Free work seat for an agent, or null. Seats in an `IDE` area are skipped
-   * unless `allowIde` (the IDE role hook). With `near`, the closest seat wins;
+   * unless `allowIde` (the IDE role), which then prefers them. With `near`, the closest seat wins;
    * otherwise the 3-stage folder/Area picker (mapped Areas → unzoned → any).
    */
   findFreeWorkSeat(opts: WorkSeatQuery = {}): string | null {
@@ -343,6 +357,9 @@ export class OfficeState {
     );
     if (free.length === 0) return null;
     if (opts.near) return this.closestOf(free, opts.near);
+    // The IDE role prefers its own area when a seat there is free
+    const ideSeat = opts.allowIde && free.find((uid) => this.seatInArea(uid, [IDE_AREA_LABEL]));
+    if (ideSeat) return ideSeat;
 
     const pick = (uids: string[]) =>
       uids.length > 0 ? uids[Math.floor(Math.random() * uids.length)] : null;
@@ -479,6 +496,7 @@ export class OfficeState {
     nearAgentId?: number,
     preferredRestSeatId?: string,
   ): void {
+    this.assignRole(id);
     const existing = this.characters.get(id);
     if (existing) {
       // Re-added mid-despawn: revive it. Its seats are still held — they are
@@ -513,6 +531,38 @@ export class OfficeState {
     if (!this.place(entry, skipSpawnEffect)) this.overflow.push(entry);
   }
 
+  private assignRole(id: number): void {
+    if (id === this.ideAgentId || this.agentNumbers.has(id)) return;
+    if (this.ideAgentId === null) {
+      this.ideAgentId = id;
+      return;
+    }
+    const used = new Set(this.agentNumbers.values());
+    let n = 1;
+    while (used.has(n)) n++;
+    this.agentNumbers.set(id, n);
+  }
+
+  /** Drop an agent's role; a closing IDE hands the role to the lowest live agent id. */
+  private releaseRole(id: number): void {
+    this.agentNumbers.delete(id);
+    if (id !== this.ideAgentId) return;
+    const next = [...this.agentNumbers.keys()].sort((a, b) => a - b)[0];
+    this.ideAgentId = next ?? null;
+    if (next !== undefined) this.agentNumbers.delete(next);
+  }
+
+  isIdeAgent(id: number): boolean {
+    return id === this.ideAgentId;
+  }
+
+  /** `IDE`, `Agente 01`… for top-level agents; undefined for sub-agents and unknown ids. */
+  getAgentLabel(id: number): string | undefined {
+    if (id === this.ideAgentId) return 'IDE';
+    const n = this.agentNumbers.get(id);
+    return n === undefined ? undefined : `Agente ${String(n).padStart(2, '0')}`;
+  }
+
   /** Agent ids waiting for a free work seat, oldest first (no character exists for them). */
   getOverflowAgentIds(): number[] {
     return this.overflow.map((e) => e.id);
@@ -532,10 +582,18 @@ export class OfficeState {
     const anchorId = e.parentAgentId ?? e.nearAgentId;
     const anchorAt =
       anchorId !== undefined ? anchorTile(this.characters.get(anchorId), this.seats) : undefined;
+    const isIde = this.isIdeAgent(e.id);
+    // Only the IDE may (re)claim a seat in the IDE area
+    const preferred =
+      e.preferredSeatId && (isIde || !this.seatInArea(e.preferredSeatId, [IDE_AREA_LABEL]))
+        ? e.preferredSeatId
+        : undefined;
     const seatId =
-      this.claimSeat(e.preferredSeatId, true) ??
+      this.claimSeat(preferred, true) ??
       this.claimSeat(
-        this.findFreeWorkSeat(anchorAt ? { near: anchorAt } : { folderName: e.folderName }),
+        this.findFreeWorkSeat(
+          anchorAt ? { near: anchorAt } : { folderName: e.folderName, allowIde: isIde },
+        ),
         true,
       );
     if (!seatId) return false;
@@ -551,6 +609,7 @@ export class OfficeState {
     ch.isActive = e.isActive;
     if (e.isHeadless) ch.isHeadless = true;
     if (e.folderName) ch.folderName = e.folderName;
+    if (e.team) Object.assign(ch, e.team);
     if (e.parentAgentId !== undefined) {
       ch.isSubagent = true;
       ch.parentAgentId = e.parentAgentId;
@@ -583,6 +642,13 @@ export class OfficeState {
       parentAgentId: ch.isSubagent && ch.parentAgentId !== null ? ch.parentAgentId : undefined,
       isActive: ch.isActive,
       isHeadless: !!ch.isHeadless,
+      team: {
+        teamName: ch.teamName,
+        agentName: ch.agentName,
+        isTeamLead: ch.isTeamLead,
+        leadAgentId: ch.leadAgentId,
+        teamUsesTmux: ch.teamUsesTmux,
+      },
     };
   }
 
@@ -651,6 +717,7 @@ export class OfficeState {
   }
 
   removeAgent(id: number): void {
+    this.releaseRole(id);
     if (this.dropOverflow(id)) return;
     const ch = this.characters.get(id);
     if (!ch) return;
@@ -1068,6 +1135,20 @@ export class OfficeState {
     leadAgentId?: number,
     teamUsesTmux?: boolean,
   ): void {
+    const waiting = this.overflow.find((e) => e.id === id);
+    if (waiting) {
+      waiting.team = {
+        teamName,
+        agentName,
+        isTeamLead,
+        leadAgentId,
+        teamUsesTmux: teamUsesTmux ?? waiting.team?.teamUsesTmux,
+      };
+      if (leadAgentId !== undefined) {
+        waiting.isHeadless = false;
+        waiting.nearAgentId = leadAgentId;
+      }
+    }
     const ch = this.characters.get(id);
     if (!ch) return;
     const wasUnlinked = ch.leadAgentId === undefined;

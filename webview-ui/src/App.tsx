@@ -8,6 +8,7 @@ import { DebugView } from './components/DebugView.js';
 import { EditActionBar } from './components/EditActionBar.js';
 import { IntroBubble } from './components/IntroBubble.js';
 import { MigrationNotice } from './components/MigrationNotice.js';
+import { OverflowBadge } from './components/OverflowBadge.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { Tooltip } from './components/Tooltip.js';
 import { Modal } from './components/ui/Modal.js';
@@ -99,6 +100,9 @@ function App() {
     watchAllSessions,
     setWatchAllSessions,
     alwaysShowLabels,
+    agentTaskTitles,
+    taskTitleFromPrompt,
+    setTaskTitleFromPrompt,
     ghostHeadlessAgents,
     setGhostHeadlessAgents,
     hooksEnabled,
@@ -473,6 +477,7 @@ function App() {
           <ToolOverlay
             officeState={officeState}
             agents={agents}
+            agentTaskTitles={agentTaskTitles}
             agentTools={agentTools}
             subagentTools={subagentTools}
             subagentCharacters={subagentCharacters}
@@ -487,6 +492,14 @@ function App() {
                 : undefined
             }
           />
+
+          {!editor.isEditMode && (
+            <OverflowBadge
+              officeState={officeState}
+              agentTaskTitles={agentTaskTitles}
+              subagentCharacters={subagentCharacters}
+            />
+          )}
         </>
       ) : (
         <DebugView
@@ -592,6 +605,12 @@ function App() {
         onToggleDebugMode={handleToggleDebugMode}
         alwaysShowOverlay={alwaysShowOverlay}
         onToggleAlwaysShowOverlay={handleToggleAlwaysShowOverlay}
+        taskTitleFromPrompt={taskTitleFromPrompt}
+        onToggleTaskTitleFromPrompt={() => {
+          const newVal = !taskTitleFromPrompt;
+          setTaskTitleFromPrompt(newVal);
+          transport.send({ type: 'setTaskTitleFromPrompt', enabled: newVal });
+        }}
         ghostHeadlessAgents={ghostHeadlessAgents}
         onToggleGhostHeadlessAgents={handleToggleGhostHeadlessAgents}
         externalAssetDirectories={externalAssetDirectories}

@@ -15,6 +15,9 @@ interface SettingsModalProps {
   onToggleDebugMode: () => void;
   alwaysShowOverlay: boolean;
   onToggleAlwaysShowOverlay: () => void;
+  /** Derive an agent's task title from its first prompt when no tag/todo gives one. */
+  taskTitleFromPrompt: boolean;
+  onToggleTaskTitleFromPrompt: () => void;
   /** Whether headless agents (adopted, no terminal to focus) render translucent. */
   ghostHeadlessAgents: boolean;
   onToggleGhostHeadlessAgents: () => void;
@@ -45,6 +48,8 @@ export function SettingsModal({
   onToggleDebugMode,
   alwaysShowOverlay,
   onToggleAlwaysShowOverlay,
+  taskTitleFromPrompt,
+  onToggleTaskTitleFromPrompt,
   ghostHeadlessAgents,
   onToggleGhostHeadlessAgents,
   externalAssetDirectories,
@@ -193,6 +198,11 @@ export function SettingsModal({
         label="Always Show Labels"
         checked={alwaysShowOverlay}
         onChange={onToggleAlwaysShowOverlay}
+      />
+      <Checkbox
+        label="Task Title from Prompt"
+        checked={taskTitleFromPrompt}
+        onChange={onToggleTaskTitleFromPrompt}
       />
       {/* Headless agents are the office's only terminal-less citizens in VS Code.
           Standalone has no terminals at all, so nothing there would ever ghost. */}

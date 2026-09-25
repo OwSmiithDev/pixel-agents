@@ -23,6 +23,7 @@ import type { OfficeState } from '../engine/officeState.js';
 import { overlayProjection } from '../projection.js';
 import type { ToolActivity } from '../types.js';
 import { CharacterState } from '../types.js';
+import { compactOverlayText, taskTitleText } from './overlayText.js';
 
 // Both turn-end states show the green checkmark bubble. A finished turn (Stop)
 // shows ONLY the checkmark (the label falls through to its normal idle text);
@@ -33,6 +34,8 @@ const WAITING_INPUT_ACTIVITY_TEXT = 'Waiting for input';
 interface ToolOverlayProps {
   officeState: OfficeState;
   agents: number[];
+  /** Server-derived task title per agent (agentTask). Untrusted plain text. */
+  agentTaskTitles: Record<number, string>;
   agentTools: Record<number, ToolActivity[]>;
   subagentTools: Record<number, Record<string, ToolActivity[]>>;
   subagentCharacters: SubagentCharacter[];
@@ -95,6 +98,7 @@ function getFuelColor(ratio: number): string {
 export function ToolOverlay({
   officeState,
   agents,
+  agentTaskTitles,
   agentTools,
   subagentTools,
   subagentCharacters,
@@ -224,65 +228,84 @@ export function ToolOverlay({
 
         // Team info
         const teamRoleLabel = ch.isTeamLead ? 'LEAD' : ch.agentName || null;
-        const hasExtraLines = !!(ch.folderName || teamRoleLabel);
+        // Role label: `IDE` / `Agente NN`; sub-agents keep their "Subtask: …" label
+        const subLabel = isSub ? subagentCharacters.find((s) => s.id === id)?.label : undefined;
+        const roleLabel = isSub ? subLabel || 'Subtask' : officeState.getAgentLabel(id);
+        const taskTitle = isSub ? null : agentTaskTitles[id];
+        const expanded = isSelected || isHovered;
 
         // Context gauge. Every agent gets one — lead, teammate, adopted,
         // headless — as soon as it has taken a turn. Sub-agents never do: they
         // have no session of their own, so contextTokens stays 0.
         const contextRatio = ch.contextTokens / ch.maxContextTokens;
-        const showContextGauge = !isSub && ch.contextTokens > 0;
+        const showContextGauge = expanded && !isSub && ch.contextTokens > 0;
 
-        return (
-          <div
-            key={id}
-            className="absolute flex flex-col items-center -translate-x-1/2"
-            style={{
-              left: screenX,
-              top: screenY - (hasExtraLines ? 34 : 28),
-              pointerEvents: isSelected ? 'auto' : 'none',
-              opacity: alwaysShowOverlay && !isSelected && !isHovered ? (isSub ? 0.5 : 0.75) : 1,
-              zIndex: isSelected ? 42 : 41,
-            }}
-            data-testid="agent-overlay"
-            data-agent-id={id}
-          >
-            <motion.div
-              className="flex items-center border-border px-8 pt-2 pb-4 gap-5 pixel-panel whitespace-nowrap max-w-2xs"
-              initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: 'spring', stiffness: 520, damping: 34, mass: 0.6 }}
-            >
-              {dotColor && (
-                <span
-                  className={`w-6 h-6 rounded-full shrink-0 ${isActive && !hasPermission && !hasWaiting ? 'pixel-pulse' : ''}`}
-                  style={{ background: dotColor }}
-                />
-              )}
-              <div className="flex flex-col gap-0 overflow-hidden">
-                {teamRoleLabel && (
+        const dot = dotColor && (
+          <span
+            className={`w-6 h-6 rounded-full shrink-0 ${isActive && !hasPermission && !hasWaiting ? 'pixel-pulse' : ''}`}
+            style={{ background: dotColor }}
+          />
+        );
+        const line = 'overflow-hidden text-ellipsis whitespace-nowrap block leading-none';
+
+        let body: React.ReactNode;
+        if (!expanded) {
+          // COMPACT: one small line, no gauge, no close button
+          const text = compactOverlayText(
+            roleLabel,
+            taskTitle,
+            isSub && activityText === roleLabel ? undefined : activityText,
+          );
+          body = (
+            <>
+              {dot}
+              <span
+                className={`${line} text-2xs max-w-220`}
+                style={{ fontStyle: isSub ? 'italic' : undefined }}
+                title={text}
+              >
+                {text}
+              </span>
+            </>
+          );
+        } else {
+          // EXPANDED: label (+ team role), task title, activity
+          const line2 = isSub ? null : taskTitleText(taskTitle);
+          const line3 = isSub && activityText === roleLabel ? null : activityText;
+          body = (
+            <>
+              {dot}
+              <div className="flex flex-col gap-2 overflow-hidden">
+                <span className={`${line} text-xs`} title={roleLabel}>
+                  {roleLabel}
+                  {teamRoleLabel && (
+                    <span
+                      style={{
+                        color: ch.isTeamLead ? TEAM_LEAD_COLOR : TEAM_ROLE_COLOR,
+                        fontWeight: ch.isTeamLead ? 'bold' : undefined,
+                      }}
+                    >
+                      {roleLabel ? ' · ' : ''}
+                      {teamRoleLabel}
+                    </span>
+                  )}
+                </span>
+                {line2 && (
                   <span
-                    className="overflow-hidden text-ellipsis block leading-none"
-                    style={{
-                      fontSize: '18px',
-                      color: ch.isTeamLead ? TEAM_LEAD_COLOR : TEAM_ROLE_COLOR,
-                      fontWeight: ch.isTeamLead ? 'bold' : undefined,
-                    }}
+                    className={`${line} text-sm`}
+                    style={{ opacity: taskTitle ? undefined : 0.6 }}
+                    title={line2}
                   >
-                    {teamRoleLabel}
+                    {line2}
                   </span>
                 )}
-                <span
-                  className="overflow-hidden text-ellipsis block leading-none"
-                  style={{
-                    fontSize: isSub ? '20px' : '22px',
-                    fontStyle: isSub ? 'italic' : undefined,
-                  }}
-                >
-                  {activityText}
-                </span>
-                {ch.folderName && (
-                  <span className="text-2xs leading-none overflow-hidden text-ellipsis block">
-                    {ch.folderName}
+                {line3 && (
+                  <span
+                    className={`${line} text-xs text-text-muted`}
+                    style={{ fontStyle: isSub ? 'italic' : undefined }}
+                    title={line3}
+                  >
+                    {line3}
                   </span>
                 )}
               </div>
@@ -300,6 +323,35 @@ export function ToolOverlay({
                   ×
                 </Button>
               )}
+            </>
+          );
+        }
+
+        return (
+          <div
+            key={id}
+            // Bottom-anchored (-translate-y-full) so a taller expanded panel grows
+            // upward and never covers the character's head.
+            className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-full"
+            style={{
+              left: screenX,
+              top: screenY - 2,
+              pointerEvents: isSelected ? 'auto' : 'none',
+              opacity: alwaysShowOverlay && !expanded ? (isSub ? 0.5 : 0.75) : 1,
+              zIndex: isSelected ? 42 : expanded ? 41 : 40,
+            }}
+            data-testid="agent-overlay"
+            data-agent-id={id}
+          >
+            <motion.div
+              className={`flex items-center border-border pixel-panel whitespace-nowrap ${
+                expanded ? 'px-8 pt-4 pb-6 gap-5 max-w-2xs' : 'px-4 pt-1 pb-3 gap-4'
+              }`}
+              initial={reduceMotion ? false : { opacity: 0, y: 6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 520, damping: 34, mass: 0.6 }}
+            >
+              {body}
             </motion.div>
             {showContextGauge && (
               <div

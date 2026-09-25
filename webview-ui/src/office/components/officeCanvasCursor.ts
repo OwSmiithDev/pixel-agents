@@ -11,6 +11,8 @@ export interface OfficeCursorTile {
 
 export interface OfficeCursorSeat {
   assigned: unknown;
+  /** Work seat (faces a PC). Only work seats accept a reassignment; absent = work. */
+  isWork?: boolean;
 }
 
 export interface OfficeCursorCharacter {
@@ -41,14 +43,18 @@ export function computeNormalModeCursor(state: OfficeCursorState): OfficeCursor 
   }
 
   // 3. Seat-reassignment hover — when a character is selected and the hovered
-  //    tile is either an unassigned seat OR the selected character's own seat.
+  //    tile is either an unassigned WORK seat (reassignSeat refuses rest seats)
+  //    OR the selected character's own seat.
   if (state.selectedAgentId !== null && state.tile) {
     const seatId = state.getSeatAtTile(state.tile.col, state.tile.row);
     if (seatId) {
       const seat = state.getSeat(seatId);
       if (seat) {
         const selectedCh = state.getCharacter(state.selectedAgentId);
-        if (!seat.assigned || (selectedCh && selectedCh.seatId === seatId)) {
+        if (
+          (!seat.assigned && seat.isWork !== false) ||
+          (selectedCh && selectedCh.seatId === seatId)
+        ) {
           return 'pointer';
         }
       }

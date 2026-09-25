@@ -207,6 +207,10 @@ export const AUTO_ON_SIDE_DEPTH = 2;
 export const CHARACTER_HIT_HALF_WIDTH = 8;
 export const CHARACTER_HIT_HEIGHT = 24;
 export const TOOL_OVERLAY_VERTICAL_OFFSET = 32;
+/** Task titles (agentTask) are capped server-side at 60; re-capped here as untrusted input. */
+export const TASK_TITLE_MAX_CHARS = 60;
+/** How often the overflow badge re-reads OfficeState's waiting list. */
+export const OVERFLOW_POLL_MS = 500;
 
 // ── Greeter + Intro bubble ──────────────────────────────────
 /** Reserved character id for the Intro's greeter. Far outside both real agent

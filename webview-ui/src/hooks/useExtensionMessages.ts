@@ -87,6 +87,11 @@ interface ExtensionMessageState {
   watchAllSessions: boolean;
   setWatchAllSessions: (v: boolean) => void;
   alwaysShowLabels: boolean;
+  /** Task title per agent (agentTask); agents without one are absent. Untrusted plain text. */
+  agentTaskTitles: Record<number, string>;
+  /** Derive task titles from the user's prompt (settingsLoaded; absent = true). */
+  taskTitleFromPrompt: boolean;
+  setTaskTitleFromPrompt: (v: boolean) => void;
   ghostHeadlessAgents: boolean;
   setGhostHeadlessAgents: (v: boolean) => void;
   hooksEnabled: boolean;
@@ -141,6 +146,8 @@ export function useExtensionMessages(
   const [extensionVersion, setExtensionVersion] = useState('');
   const [watchAllSessions, setWatchAllSessions] = useState(false);
   const [alwaysShowLabels, setAlwaysShowLabels] = useState(false);
+  const [agentTaskTitles, setAgentTaskTitles] = useState<Record<number, string>>({});
+  const [taskTitleFromPrompt, setTaskTitleFromPrompt] = useState(true);
   const [ghostHeadlessAgents, setGhostHeadlessAgentsState] = useState(false);
   const [hooksEnabled, setHooksEnabled] = useState(true);
   const [hooksInstalled, setHooksInstalled] = useState<Record<string, boolean>>({});
@@ -288,6 +295,16 @@ export function useExtensionMessages(
             ch.leadAgentId = teammateParentId;
             ch.teamName = teamName ?? parentCh?.teamName;
             ch.agentName = teammateName;
+          } else {
+            // Overflowed (no free work seat): keep it on the waiting entry so
+            // promotion seats it with its team data.
+            os.setTeamInfo(
+              id,
+              teamName ?? parentCh?.teamName,
+              teammateName,
+              undefined,
+              teammateParentId,
+            );
           }
         } else {
           const palette = msg.palette as number | undefined;
@@ -310,6 +327,12 @@ export function useExtensionMessages(
           return next;
         });
         setAgentStatuses((prev) => {
+          if (!(id in prev)) return prev;
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setAgentTaskTitles((prev) => {
           if (!(id in prev)) return prev;
           const next = { ...prev };
           delete next[id];
@@ -662,6 +685,8 @@ export function useExtensionMessages(
         if (typeof msg.alwaysShowLabels === 'boolean') {
           setAlwaysShowLabels(msg.alwaysShowLabels as boolean);
         }
+        // Absent = on (older servers never sent it)
+        setTaskTitleFromPrompt(msg.taskTitleFromPrompt !== false);
         if (typeof msg.ghostHeadlessAgents === 'boolean') {
           applyGhostHeadlessAgents(msg.ghostHeadlessAgents as boolean);
         }
@@ -742,6 +767,16 @@ export function useExtensionMessages(
           msg.leadAgentId as number | undefined,
           msg.teamUsesTmux as boolean | undefined,
         );
+      } else if (msg.type === 'agentTask') {
+        const id = msg.id as number;
+        const title = typeof msg.title === 'string' ? msg.title : null;
+        setAgentTaskTitles((prev) => {
+          if (title) return prev[id] === title ? prev : { ...prev, [id]: title };
+          if (!(id in prev)) return prev;
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
       } else if (msg.type === 'agentContextUsage') {
         const id = msg.id as number;
         os.setAgentContext(id, msg.contextTokens as number, msg.maxContextTokens as number);
@@ -786,6 +821,9 @@ export function useExtensionMessages(
     watchAllSessions,
     setWatchAllSessions,
     alwaysShowLabels,
+    agentTaskTitles,
+    taskTitleFromPrompt,
+    setTaskTitleFromPrompt,
     ghostHeadlessAgents,
     setGhostHeadlessAgents: applyGhostHeadlessAgents,
     hooksEnabled,

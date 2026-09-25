@@ -56,6 +56,8 @@ export interface Seat {
   /** Direction character faces when sitting (toward adjacent desk) */
   facingDir: Direction;
   assigned: boolean;
+  /** Faces electronics (work seat); set by OfficeState when seats are classified */
+  isWork?: boolean;
 }
 
 export interface FurnitureInstance {
