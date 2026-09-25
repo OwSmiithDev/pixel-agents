@@ -57,6 +57,8 @@ declare global {
         row: number;
         areaLabel: string | null;
         assigned: boolean;
+        /** Work seat (faces a PC): the only kind agents are auto-seated on. */
+        isWorkSeat: boolean;
       }>;
       /** Drive the real edit-mode tile paint/erase handlers by (col,row),
        *  bypassing only canvas pixel→tile geometry (mirrors petClick). */
@@ -266,6 +268,7 @@ export function installTestHooks(officeStateRef: { current: OfficeState | null }
       row: seat.seatRow,
       areaLabel: os.seatZone(uid),
       assigned: seat.assigned,
+      isWorkSeat: os.isWorkSeat(uid),
     }));
   };
 
@@ -278,6 +281,7 @@ export function installTestHooks(officeStateRef: { current: OfficeState | null }
     skipSpawnEffect,
     folderName,
     nearAgentId,
+    preferredRestSeatId,
   ) {
     origAddAgent.call(
       this,
@@ -288,6 +292,7 @@ export function installTestHooks(officeStateRef: { current: OfficeState | null }
       skipSpawnEffect,
       folderName,
       nearAgentId,
+      preferredRestSeatId,
     );
     const ch = this.characters.get(id);
     hooks.addAgentLog?.push({

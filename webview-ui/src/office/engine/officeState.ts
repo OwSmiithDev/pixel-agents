@@ -305,9 +305,13 @@ export class OfficeState {
         .filter((s) => this.isSeatFacingElectronics(s, electronics))
         .map((s) => s.uid),
     );
+    // No PC-facing seat at all: every seat is a work seat (no rest seats), so
+    // agents still appear on layouts without electronics.
+    if (this.workSeatIds.size === 0) this.workSeatIds = new Set(this.seats.keys());
   }
 
-  /** Work seat = a seat facing electronics (PC, monitor). Every other seat is a rest seat. */
+  /** Work seat = a seat facing electronics (PC, monitor). Every other seat is a
+   *  rest seat, unless the layout has no PC-facing seat: then all seats are work seats. */
   isWorkSeat(uid: string): boolean {
     return this.workSeatIds.has(uid);
   }

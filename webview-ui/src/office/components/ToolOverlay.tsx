@@ -147,7 +147,10 @@ export function ToolOverlay({
         if (!alwaysShowOverlay && !isSelected && !isHovered) return null;
 
         // Position above character
-        const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0;
+        const sittingOffset =
+          ch.state === CharacterState.TYPE || ch.state === CharacterState.REST
+            ? CHARACTER_SITTING_OFFSET_PX
+            : 0;
         const lift = sittingOffset - TOOL_OVERLAY_VERTICAL_OFFSET;
         const anchor = anchorToScreen
           ? anchorToScreen(ch.x, ch.y, lift)

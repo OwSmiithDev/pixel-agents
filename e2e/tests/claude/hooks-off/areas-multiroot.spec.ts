@@ -29,7 +29,7 @@ import { getPixelAgentsFrame, openPixelAgentsPanel } from '../../../helpers/webv
  * seats) loads; specs discover seat coordinates via the getSeats hook rather
  * than hardcoding layout positions. Seat-preference is asserted by AREA
  * MEMBERSHIP (the seated agent's area === the mapped label), which is invariant
- * under findFreeSeat's PC-bias randomness.
+ * under findFreeWorkSeat's random pick among work (PC-facing) seats.
  */
 
 const ALPHA = 'alpha';
@@ -142,11 +142,12 @@ test.describe('Areas (multi-root)', () => {
   test.describe('seat preference (alpha → Engineering)', () => {
     test.use({ seedConfig: buildSeedConfig({ areaMappings: { [ALPHA]: ['Engineering'] } }) });
 
-    /** Add "Engineering", paint it over some real (free) seats, and save. */
+    /** Add "Engineering", paint it over some real free WORK seats (agents are
+     *  only auto-seated on PC-facing seats), and save. */
     async function paintAndSaveEngineering(frame: Frame): Promise<void> {
       await startArea(frame, 'Engineering');
       const seats = await readSeats(frame);
-      const targetSeats = seats.filter((s) => !s.assigned).slice(0, 3);
+      const targetSeats = seats.filter((s) => s.isWorkSeat && !s.assigned).slice(0, 3);
       expect(targetSeats.length).toBeGreaterThan(0);
       for (const seat of targetSeats) {
         await paintTile(frame, seat.col, seat.row);
@@ -174,7 +175,7 @@ test.describe('Areas (multi-root)', () => {
       await paintAndSaveEngineering(frame);
 
       // Spawn alpha (mapped → Engineering). The terminal takes the panel, so
-      // re-acquire the webview; the restored agent re-seats via findFreeSeat with
+      // re-acquire the webview; the restored agent re-seats via findFreeWorkSeat with
       // the persisted area + mapping → an Engineering seat.
       await addAgentForFolder(frame, ALPHA, tmpHome, mockLogFile);
       narrator.step('re-opening the panel — the spawned terminal disposed the webview');

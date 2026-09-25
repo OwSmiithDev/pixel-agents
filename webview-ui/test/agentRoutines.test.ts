@@ -97,6 +97,19 @@ describe('seat classification', () => {
     assert.equal(rest.size, 9, 'distinct rest seats');
   });
 
+  test('layout with chairs but no PCs: every seat is a work seat, agents still appear', () => {
+    const layout = userLayout();
+    layout.furniture = layout.furniture.filter((f) => !f.type.includes('PC'));
+    const os = new OfficeState(layout);
+    assert.ok(os.seats.size > 0);
+    for (const uid of os.seats.keys()) assert.equal(os.isWorkSeat(uid), true, uid);
+    for (let id = 1; id <= 5; id++) os.addAgent(id, 0, 0, undefined, true);
+    assert.deepEqual(os.getOverflowAgentIds(), []);
+    const seats = new Set([...os.characters.values()].map((c) => c.seatId));
+    assert.equal(seats.size, 5, 'five distinct seats');
+    assert.ok(!seats.has(null));
+  });
+
   test('findFreeWorkSeat can opt into IDE seats (hook for the IDE role)', () => {
     const os = fullOffice();
     assert.equal(os.findFreeWorkSeat(), null);
