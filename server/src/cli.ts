@@ -24,6 +24,7 @@ import {
   getHooksEnabled,
   getTaskTitleFromPrompt,
   grantHooksConsent,
+  grantHooksConsentKeepingVersion,
   readConfig,
 } from './configPersistence.js';
 import { LEGACY_HOOKS_CONSENT_VERSION, MAX_PORT, MIN_PORT } from './constants.js';
@@ -161,10 +162,11 @@ async function main(): Promise<void> {
       if (!provider) return; // unknown id: nothing to install into
       if (enabled) {
         // An explicit toggle in the UI IS the consent to modify the
-        // provider's settings file. The bundled claude-hook.js script belongs
+        // provider's settings file (keeping an existing grant's version: no
+        // disclosure was shown, so it cannot widen the scope). The bundled claude-hook.js script belongs
         // to the Claude provider alone; another provider's install must
         // neither copy it nor be blocked by it.
-        grantHooksConsent(provider.id);
+        grantHooksConsentKeepingVersion(provider.id);
         if (
           provider.id === claudeProvider.id &&
           !copyHookScriptOrReport(packageRoot, ' (user toggle)')

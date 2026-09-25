@@ -9,6 +9,7 @@ import {
   clearHooksAnswer,
   clearHooksConsent,
   getHooksConsent,
+  grantHooksConsent,
   isHooksConsentCurrent,
   recordHooksDecline,
 } from '../../configPersistence.js';
@@ -88,11 +89,12 @@ async function runConsentChoice(
 
   switch (consentActionFor(choice, { installed, consent, outdated })) {
     case 'install':
-      // Clicking Install IS the consent grant, exactly like the Settings
-      // toggle — so it takes that same path, which grants, installs, then
-      // re-derives the on-disk state before persisting the preference.
-      // Reimplementing the grant here would drop that last step. An earlier
-      // decline is replaced by the toggle path's grant.
+      // Clicking Install IS the consent grant against the disclosure just
+      // shown, so it grants the CURRENT version here (upgrading an older
+      // grant; the toggle path alone keeps a grant's version) and replaces an
+      // earlier decline. Then the Settings-toggle path installs and re-derives
+      // the on-disk state before persisting the preference.
+      grantHooksConsent(providerId);
       await effects.setHooksEnabled(true);
       break;
 

@@ -236,6 +236,18 @@ export function grantHooksConsent(providerId: string, version = HOOKS_CONSENT_VE
   }
 }
 
+/** The Settings-toggle grant: an EXISTING grant keeps its disclosure version (a toggle shows no disclosure, so it
+ *  must not upgrade a v1 grant and silently add the prompt hook); with no grant yet, the toggle grants the current
+ *  one. Only the consent executor's install arm (an answer to the shown disclosure) upgrades. */
+export function grantHooksConsentKeepingVersion(providerId: string): void {
+  const cfg = readConfig();
+  const version =
+    cfg.hooksConsent[providerId] === 'granted'
+      ? (cfg.hooksConsentVersion?.[providerId] ?? LEGACY_HOOKS_CONSENT_VERSION)
+      : HOOKS_CONSENT_VERSION;
+  grantHooksConsent(providerId, version);
+}
+
 /** True when this provider's consent was granted against the CURRENT disclosure
  *  (HOOKS_CONSENT_VERSION). Only that authorizes the scope the newer disclosure
  *  added (the Claude prompt hook); an older grant still covers what it covered. */

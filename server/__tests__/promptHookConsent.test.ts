@@ -16,6 +16,7 @@ const config = await import('../src/configPersistence.js');
 const { claudeProvider } = await import('../src/providers/hook/claude/claude.js');
 const { consentActionFor, hooksConsentRequest } =
   await import('../src/providers/hook/consentGate.js');
+const { applyConsentChoice } = await import('../src/providers/hook/consentExecutor.js');
 const { LEGACY_HOOKS_CONSENT_VERSION } = await import('../src/constants.js');
 
 /** Events holding one of OUR hook commands in ~/.claude/settings.json. */
@@ -131,5 +132,46 @@ describe('prompt hook (UserPromptSubmit) consent + taskTitleFromPrompt', () => {
     } finally {
       runtime.dispose();
     }
+  });
+
+  /** The Settings toggle as both surfaces run it (cli.ts / PixelAgentsViewProvider.setHooksEnabled). */
+  async function toggleHooks(enabled: boolean): Promise<void> {
+    if (enabled) {
+      config.grantHooksConsentKeepingVersion('claude');
+      await claudeProvider.installHooks('', '');
+    } else {
+      await claudeProvider.uninstallHooks();
+    }
+  }
+
+  it('a Settings toggle off/on keeps a v1 grant at v1: no prompt hook, re-ask still pending', async () => {
+    config.grantHooksConsent('claude', LEGACY_HOOKS_CONSENT_VERSION);
+    await claudeProvider.installHooks('', '');
+    await toggleHooks(false);
+    await toggleHooks(true);
+    expect(ourEvents()).toContain('Stop');
+    expect(ourEvents()).not.toContain('UserPromptSubmit');
+    expect(config.isHooksConsentCurrent('claude')).toBe(false);
+    expect(config.needsHooksReconsent('claude')).toBe(true);
+  });
+
+  it('a Settings toggle with no grant yet grants the current version', () => {
+    config.grantHooksConsentKeepingVersion('claude');
+    expect(config.isHooksConsentCurrent('claude')).toBe(true);
+  });
+
+  it('Install on the re-consent ask (the executor) upgrades the grant and adds the prompt hook', async () => {
+    config.grantHooksConsent('claude', LEGACY_HOOKS_CONSENT_VERSION);
+    await claudeProvider.installHooks('', '');
+    await applyConsentChoice('claude', 'install', {
+      setHooksEnabled: (enabled) => toggleHooks(enabled),
+      uninstallHooks: () => claudeProvider.uninstallHooks(),
+      areHooksInstalled: () => claudeProvider.areHooksInstalled(),
+      syncHooksPreferenceOff: () => {},
+      reportHooksStatus: async () => {},
+      setTaskTitleFromPrompt: async () => {},
+    });
+    expect(config.isHooksConsentCurrent('claude')).toBe(true);
+    expect(ourEvents()).toContain('UserPromptSubmit');
   });
 });

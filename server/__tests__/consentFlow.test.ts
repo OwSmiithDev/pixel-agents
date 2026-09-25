@@ -23,6 +23,7 @@ import {
   getHooksConsent,
   getHooksEnabled,
   grantHooksConsent,
+  readConfig,
   setHooksEnabled,
 } from '../src/configPersistence.js';
 import { FileStateAdapter } from '../src/fileStateAdapter.js';
@@ -205,7 +206,10 @@ describe('clientMessageHandler: hooks consent flow', () => {
       answer('install');
       await settle();
 
-      expect(getHooksEnabled('claude')).toBe(false);
+      // Install is a grant against the shown disclosure: it replaces the decline (and with it the decline's own
+      // hooks-off, see grantHooksConsent), but a FAILED install never persists hooks-on.
+      expect(getHooksConsent('claude')).toBe('granted');
+      expect(readConfig().hooksEnabled.claude).toBeUndefined();
       expect(sent.filter((m) => m.type === 'hooksStatus').at(-1)).toEqual({
         type: 'hooksStatus',
         providerId: 'claude',

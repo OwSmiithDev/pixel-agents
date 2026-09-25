@@ -31,6 +31,7 @@ import {
   getHooksEnabled,
   getTaskTitleFromPrompt,
   grantHooksConsent,
+  grantHooksConsentKeepingVersion,
   needsHooksReconsent,
   readConfig,
   setHooksEnabled as persistHooksEnabled,
@@ -292,8 +293,9 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   private async setHooksEnabled(provider: HookProvider, enabled: boolean): Promise<void> {
     if (enabled) {
       // An explicit Settings toggle IS the consent to modify the provider's
-      // settings file.
-      grantHooksConsent(provider.id);
+      // settings file (keeping an existing grant's version: no disclosure was
+      // shown, so it cannot widen the scope).
+      grantHooksConsentKeepingVersion(provider.id);
       const serverConfig = this.pixelAgentsServer?.getConfig();
       await this.installHooksAndScript(provider, serverConfig?.port, serverConfig?.token);
     } else {
