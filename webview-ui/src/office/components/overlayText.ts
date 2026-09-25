@@ -18,6 +18,7 @@ export function taskTitleText(title: string | null | undefined): string {
 
 /**
  * Compact overlay line: `<label> · <short>`, short = task title, else activity.
+ * An `urgent` activity (needs approval / waiting for input) wins over the title.
  * Returned in full — the overlay ellipsizes it with CSS and puts it in `title`,
  * so the DOM text stays searchable.
  */
@@ -25,8 +26,10 @@ export function compactOverlayText(
   label: string | undefined,
   title: string | null | undefined,
   activity: string | undefined,
+  urgent = false,
 ): string {
-  const short = cleanTaskTitle(title) ?? activity?.trim() ?? '';
+  const act = activity?.trim() || null;
+  const short = (urgent && act) || cleanTaskTitle(title) || act || '';
   const parts = [label, short].filter((p): p is string => !!p);
   if (parts.length === 2 && parts[0] === parts[1]) return parts[0];
   return parts.join(' · ');

@@ -255,6 +255,7 @@ export function ToolOverlay({
             roleLabel,
             taskTitle,
             isSub && activityText === roleLabel ? undefined : activityText,
+            activityText === 'Needs approval' || activityText === WAITING_INPUT_ACTIVITY_TEXT,
           );
           body = (
             <>

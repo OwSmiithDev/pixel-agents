@@ -176,6 +176,22 @@ describe('compact overlay text', () => {
     assert.equal(compactOverlayText(undefined, null, undefined), '');
   });
 
+  test('an urgent activity wins over the task title', () => {
+    assert.equal(
+      compactOverlayText('Agente 03', 'Corrigir login', 'Needs approval', true),
+      'Agente 03 · Needs approval',
+    );
+    assert.equal(
+      compactOverlayText('Agente 03', 'Corrigir login', 'Waiting for input', true),
+      'Agente 03 · Waiting for input',
+    );
+    // urgent without an activity still falls back to the title
+    assert.equal(
+      compactOverlayText('IDE', 'Corrigir login', undefined, true),
+      'IDE · Corrigir login',
+    );
+  });
+
   test('does not repeat a sub-agent label that equals its activity', () => {
     assert.equal(compactOverlayText('Subtask: x', null, 'Subtask: x'), 'Subtask: x');
   });
