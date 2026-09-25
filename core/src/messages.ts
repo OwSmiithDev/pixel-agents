@@ -103,6 +103,7 @@ export interface AgentSeatMeta {
   palette?: number;
   hueShift?: number;
   seatId?: string;
+  restSeatId?: string | null;
 }
 
 export interface AgentStatus {
@@ -356,6 +357,7 @@ export interface SeatAssignment {
   palette: number;
   hueShift: number;
   seatId: string | null;
+  restSeatId?: string | null;
 }
 
 export interface SaveLayout {

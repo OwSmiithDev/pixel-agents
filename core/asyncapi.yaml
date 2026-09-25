@@ -1128,6 +1128,11 @@ components:
           type: integer
         seatId:
           type: string
+        restSeatId:
+          type: [string, 'null']
+          description: >-
+            Rest (lounge) seat next to the work seat. Null or absent when the
+            agent has none or the state file predates it.
 
     SeatAssignment:
       description: |
@@ -1143,6 +1148,11 @@ components:
           type: integer
         seatId:
           type: [string, 'null']
+        restSeatId:
+          type: [string, 'null']
+          description: >-
+            Rest (lounge) seat. Optional so older webviews stay valid; null when
+            the agent has none.
 
     WorkspaceFolder:
       type: object

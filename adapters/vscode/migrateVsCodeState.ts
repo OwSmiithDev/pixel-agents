@@ -15,7 +15,7 @@
 
 import * as vscode from 'vscode';
 
-import type { StateAdapter } from '../../core/src/adapter.js';
+import type { SeatMeta, StateAdapter } from '../../core/src/adapter.js';
 import type { PersistedAgent } from '../../core/src/schemas.js';
 import { readLayoutFromFile, writeLayoutToFile } from '../../server/src/layoutPersistence.js';
 
@@ -83,7 +83,7 @@ export function migrateVsCodeState(context: vscode.ExtensionContext, adapter: St
   }
 
   // ── Seats (workspaceState) ──
-  type SeatsMap = Record<string, { palette?: number; hueShift?: number; seatId?: string }>;
+  type SeatsMap = Record<string, SeatMeta>;
   const legacySeats = context.workspaceState.get<SeatsMap>(WORKSPACE_KEY_AGENT_SEATS);
   if (legacySeats && Object.keys(legacySeats).length > 0) {
     try {

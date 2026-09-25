@@ -17,7 +17,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-import type { StateAdapter } from '../../core/src/adapter.js';
+import type { SeatMeta, StateAdapter } from '../../core/src/adapter.js';
 import type { PersistedAgent } from '../../core/src/schemas.js';
 import type { AdapterSettingKey, AdapterSettings, ConfigNamespace } from './configPersistence.js';
 import { ADAPTER_SETTING_KEYS, readConfig, writeConfig } from './configPersistence.js';
@@ -33,7 +33,7 @@ function settingNameOf(key: string): AdapterSettingKey | null {
 
 interface AdapterState {
   agents: PersistedAgent[];
-  seats: Record<string, { palette?: number; hueShift?: number; seatId?: string }>;
+  seats: Record<string, SeatMeta>;
 }
 
 const EMPTY_STATE: AdapterState = { agents: [], seats: {} };
@@ -85,11 +85,11 @@ export class FileStateAdapter implements StateAdapter {
     this.writeState(state);
   }
 
-  loadSeats(): Record<string, { palette?: number; hueShift?: number; seatId?: string }> {
+  loadSeats(): Record<string, SeatMeta> {
     return this.readState().seats;
   }
 
-  saveSeats(seats: Record<string, { palette?: number; hueShift?: number; seatId?: string }>): void {
+  saveSeats(seats: Record<string, SeatMeta>): void {
     const state = this.readState();
     state.seats = seats;
     this.writeState(state);

@@ -12,14 +12,23 @@
 
 import type { PersistedAgent } from './schemas.js';
 
+/** Persisted per-agent seat metadata. `restSeatId` (lounge seat) is newer:
+ *  optional so older state files still load; null = no rest seat. */
+export interface SeatMeta {
+  palette?: number;
+  hueShift?: number;
+  seatId?: string | null;
+  restSeatId?: string | null;
+}
+
 export interface StateAdapter {
   // ── Per-adapter persisted state (agents + seats) ────────────────────
 
   loadAgents(): PersistedAgent[];
   saveAgents(agents: PersistedAgent[]): void;
 
-  loadSeats(): Record<string, { palette?: number; hueShift?: number; seatId?: string }>;
-  saveSeats(seats: Record<string, { palette?: number; hueShift?: number; seatId?: string }>): void;
+  loadSeats(): Record<string, SeatMeta>;
+  saveSeats(seats: Record<string, SeatMeta>): void;
 
   // ── User-level settings (shared file, namespaced per adapter) ─────
 
