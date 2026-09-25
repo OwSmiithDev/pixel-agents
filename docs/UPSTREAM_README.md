@@ -1,6 +1,6 @@
 <h1 align="center">
   <a href="https://github.com/pixel-agents-hq/pixel-agents/discussions">
-    <img src="webview-ui/public/banner.png" alt="Pixel Agents">
+    <img src="../webview-ui/public/banner.png" alt="Pixel Agents">
   </a>
 </h1>
 
@@ -18,7 +18,7 @@
 </div>
 
 <div align="center">
-<a href="https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents">🛒 VS Code Marketplace</a> • <a href="https://open-vsx.org/extension/pablodelucca/pixel-agents">🛒 Open VSX</a> • <a href="https://www.npmjs.com/package/pixel-agents">📦 npm</a> • <a href="https://discord.gg/Yk7jXebv9H">👾 Discord</a> • <a href="https://github.com/pixel-agents-hq/pixel-agents/discussions">💬 Discussions</a> • <a href="CONTRIBUTING.md">🤝 Contributing</a> • <a href="CHANGELOG.md">📋 Changelog</a>
+<a href="https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents">🛒 VS Code Marketplace</a> • <a href="https://open-vsx.org/extension/pablodelucca/pixel-agents">🛒 Open VSX</a> • <a href="https://www.npmjs.com/package/pixel-agents">📦 npm</a> • <a href="https://discord.gg/Yk7jXebv9H">👾 Discord</a> • <a href="https://github.com/pixel-agents-hq/pixel-agents/discussions">💬 Discussions</a> • <a href="../CONTRIBUTING.md">🤝 Contributing</a> • <a href="../CHANGELOG.md">📋 Changelog</a>
 </div>
 
 <br/>
@@ -32,7 +32,7 @@ It ships in two forms from the same codebase:
 
 The architecture is fully agent-agnostic and editor-agnostic: a typed `HookProvider` interface defines the integration boundary so adding a new AI tool is a single subdirectory of code. Claude Code is the reference implementation today; Codex, Gemini, Cursor, and others are on the roadmap.
 
-![Pixel Agents screenshot](webview-ui/public/office.png)
+![Pixel Agents screenshot](../webview-ui/public/office.png)
 
 ## Features
 
@@ -61,7 +61,7 @@ Roughly three stages get there:
 2. **Actually a game.** Health bars for rate limits and token budgets. Scores for whatever you care about. Furniture that _does_ things. Offices you open like save files, one per project.
 3. **Expand the orchestration frontier.** Orchestrator characters. Form a team by dragging a box around them. Hand work between agents. Point them at a board and let them pick up tasks themselves.
 
-Most of this is still ahead. See [Issues](https://github.com/pixel-agents-hq/pixel-agents/issues) and [Discussions](https://github.com/pixel-agents-hq/pixel-agents/discussions) for what's open, and [CONTRIBUTING.md](CONTRIBUTING.md) to jump in.
+Most of this is still ahead. See [Issues](https://github.com/pixel-agents-hq/pixel-agents/issues) and [Discussions](https://github.com/pixel-agents-hq/pixel-agents/discussions) for what's open, and [CONTRIBUTING.md](../CONTRIBUTING.md) to jump in.
 
 ## Requirements
 
@@ -137,7 +137,7 @@ Layouts can grow to 64×64 tiles by clicking the ghost border outside the curren
 
 Bundled furniture, floors, walls, carpets, characters, and pets live under `webview-ui/public/assets/`. Furniture manifests describe sprites, rotation groups, state groups, and animation frames.
 
-Use **Settings → Add Asset Directory** to load external characters, pets, and furniture. See [docs/external-assets.md](docs/external-assets.md) for furniture directory structure and manifest details. The visual asset manager at `scripts/asset-manager.html` helps create furniture manifests.
+Use **Settings → Add Asset Directory** to load external characters, pets, and furniture. See [docs/external-assets.md](external-assets.md) for furniture directory structure and manifest details. The visual asset manager at `scripts/asset-manager.html` helps create furniture manifests.
 
 ## How It Works
 
@@ -183,7 +183,7 @@ npm test
 npm run e2e
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and [e2e/README.md](e2e/README.md) for the end-to-end suite.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for the development workflow and [e2e/README.md](../e2e/README.md) for the end-to-end suite.
 
 ### Hosted Test Reports
 
@@ -211,7 +211,7 @@ The staged output serves the combined `e2e`, `server`, and `webview` Allure repo
 
 Join the [Discord](https://discord.gg/Yk7jXebv9H) to chat with other users and follow development. Use [Issues](https://github.com/pixel-agents-hq/pixel-agents/issues) to report bugs or request features, and [Discussions](https://github.com/pixel-agents-hq/pixel-agents/discussions) for questions and ideas.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request and read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) before opening a pull request and read our [Code of Conduct](../CODE_OF_CONDUCT.md) before participating.
 
 ## Supporting the Project
 
