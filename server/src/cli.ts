@@ -22,10 +22,11 @@ import type { AssetCache, ReloadAssetsSideEffect } from './clientMessageHandler.
 import {
   getHooksConsent,
   getHooksEnabled,
+  getTaskTitleFromPrompt,
   grantHooksConsent,
   readConfig,
 } from './configPersistence.js';
-import { MAX_PORT, MIN_PORT } from './constants.js';
+import { LEGACY_HOOKS_CONSENT_VERSION, MAX_PORT, MIN_PORT } from './constants.js';
 import { FileStateAdapter } from './fileStateAdapter.js';
 import { claudeProvider, copyHookScript, hookProviderById } from './providers/index.js';
 import { PixelAgentsServer } from './server.js';
@@ -245,10 +246,7 @@ async function main(): Promise<void> {
     // scanners grow per-provider awareness alongside the Settings UI.
     runtime.hooksEnabled.current = getHooksEnabled(claudeProvider.id);
     runtime.watchAllSessions.current = adapter.getSetting('pixel-agents.watchAllSessions', false);
-    runtime.taskTitleFromPrompt.current = adapter.getSetting(
-      'pixel-agents.taskTitleFromPrompt',
-      true,
-    );
+    runtime.taskTitleFromPrompt.current = getTaskTitleFromPrompt();
 
     // Install hooks on startup if the persisted setting says so — gated on the
     // one-time consent to modify ~/.claude/settings.json.
@@ -257,13 +255,14 @@ async function main(): Promise<void> {
       if (!consent && (await claudeProvider.areHooksInstalled())) {
         // Our hooks are already installed and already firing — a pre-consent
         // version put them there. Grant and continue with NO prompt: the
-        // install below is the 14 -> 13 migration, and it only ever REDUCES
-        // scope (it drops TaskCreated, consumed by nothing; UserPromptSubmit,
-        // which such installs already carry, is kept for task titles). Asking would buy
-        // this user no protection they do not already have, so they are not
-        // asked. A fresh install still is, in full — in the browser UI, when a
+        // install below is the 14 -> 12 migration, and it only ever REDUCES
+        // scope (it drops UserPromptSubmit and TaskCreated). The silent grant is
+        // recorded at the LEGACY consent version, so it never authorizes the
+        // prompt hook; that needs the re-consent ask (needsHooksReconsent). Asking
+        // for the 12 would buy this user no protection they do not already have,
+        // so they are not asked for those. A fresh install still is, in full — in the browser UI, when a
         // tokened client connects (clientMessageHandler's webviewReady).
-        grantHooksConsent(claudeProvider.id);
+        grantHooksConsent(claudeProvider.id, LEGACY_HOOKS_CONSENT_VERSION);
         consent = true;
       }
       if (!consent) {

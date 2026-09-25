@@ -594,10 +594,10 @@ export function areHooksInstalled(): boolean {
  * keeps changing concurrently — callers surface the error to the user instead
  * of installing.
  */
-export async function installHooks(): Promise<void> {
+export async function installHooks(optionalEvents: readonly string[] = []): Promise<void> {
   let wrote: boolean;
   try {
-    wrote = await installEntries();
+    wrote = await installEntries([...CLAUDE_HOOK_EVENTS, ...optionalEvents]);
   } catch (e) {
     throw new Error(`${e instanceof Error ? e.message : String(e)} — hooks not installed.`, {
       cause: e,
@@ -608,7 +608,9 @@ export async function installHooks(): Promise<void> {
   }
 }
 
-function installEntries(): Promise<boolean> {
+/** `events` = the base list plus whichever optional events are allowed now;
+ *  anything else of ours is swept, which is how an optional event is removed. */
+function installEntries(events: readonly string[]): Promise<boolean> {
   return mutateClaudeSettings((settings) => {
     if (settings.hooks === undefined || settings.hooks === null) {
       settings.hooks = {};
@@ -625,10 +627,11 @@ function installEntries(): Promise<boolean> {
 
     // Migration sweep FIRST: strip our commands from every event we no longer
     // install. The per-event loop below only touches listed events, so without
-    // this a legacy install (which included TaskCreated) would keep
-    // forwarding task payloads forever — the users
+    // this a legacy install (which included UserPromptSubmit and TaskCreated)
+    // would keep forwarding prompt text and task payloads forever, and turning
+    // the optional prompt hook off would never remove it — the users
     // with the widest install would be the only ones never migrated.
-    const listed = new Set<string>(CLAUDE_HOOK_EVENTS);
+    const listed = new Set<string>(events);
     for (const event of Object.keys(hooks)) {
       if (listed.has(event)) continue;
       const entries = hooks[event];
@@ -652,7 +655,7 @@ function installEntries(): Promise<boolean> {
       }
     }
 
-    for (const event of CLAUDE_HOOK_EVENTS) {
+    for (const event of events) {
       const existing = hooks[event];
       if (existing === undefined) {
         hooks[event] = [];

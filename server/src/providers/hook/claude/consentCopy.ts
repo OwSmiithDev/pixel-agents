@@ -17,12 +17,16 @@
 
 import { CLAUDE_HOOK_EVENTS, SETTINGS_BACKUP_SUFFIX } from './constants.js';
 
+/** Events a consent given against this text installs: the base list plus the
+ *  prompt hook (on by default via taskTitleFromPrompt). */
+export const CONSENT_EVENT_COUNT = CLAUDE_HOOK_EVENTS.length + 1;
+
 const SETTINGS_FILE = '~/.claude/settings.json';
 
 /** WHY we ask + WHAT we write. */
 export const CONSENT_FACT_WHAT =
   `To bring your agents to life in real time, Pixel Agents adds hooks for ` +
-  `${CLAUDE_HOOK_EVENTS.length} Claude Code events to ${SETTINGS_FILE}. ` +
+  `${CONSENT_EVENT_COUNT} Claude Code events to ${SETTINGS_FILE}. ` +
   `Note that your existing settings are kept, and a one-time backup is saved as settings.json${SETTINGS_BACKUP_SUFFIX}.`;
 
 /** WHAT data moves, and where it stops.

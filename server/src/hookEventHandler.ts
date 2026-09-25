@@ -378,6 +378,16 @@ export class HookEventHandler {
     }
   }
 
+  /** `taskTitleFromPrompt` turned off: drop every prompt/tag title (todo titles
+   *  stay) and tell clients. A cleared title is never replayed. */
+  clearPromptTitles(): void {
+    for (const [id, agent] of this.agents) {
+      if (!agent.taskTitle) continue;
+      agent.taskTitle.fromPrompt = null;
+      this.broadcastTaskTitle(agent, id);
+    }
+  }
+
   /** Send `agentTask` when the agent's derived task title changed. */
   private broadcastTaskTitle(agent: AgentState, agentId: number): void {
     const change = agent.taskTitle && takeTaskTitleChange(agent.taskTitle);

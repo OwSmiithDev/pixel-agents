@@ -2,7 +2,12 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-import { CONFIG_FILE_NAME, LAYOUT_FILE_DIR } from './constants.js';
+import {
+  CONFIG_FILE_NAME,
+  HOOKS_CONSENT_VERSION,
+  LAYOUT_FILE_DIR,
+  LEGACY_HOOKS_CONSENT_VERSION,
+} from './constants.js';
 
 export interface AdapterSettings {
   soundEnabled: boolean;
@@ -12,9 +17,6 @@ export interface AdapterSettings {
   watchAllSessions: boolean;
   hooksInfoShown: boolean;
   showAreas: boolean;
-  /** Derive agent task titles from prompts (tag line / first words). Todo titles
-   *  work regardless. */
-  taskTitleFromPrompt: boolean;
   areaMappings: Record<string, string[]>;
 }
 
@@ -30,7 +32,6 @@ export const ADAPTER_SETTING_KEYS = [
   'watchAllSessions',
   'hooksInfoShown',
   'showAreas',
-  'taskTitleFromPrompt',
   'areaMappings',
 ] as const;
 
@@ -57,6 +58,13 @@ export interface PixelAgentsConfig {
   /** Per-provider hooks preference, machine-global for the same reason as the
    *  consent above. A provider absent from the map takes the default (true). */
   hooksEnabled: Record<string, boolean>;
+  /** Disclosure version each provider's `granted` consent was given against.
+   *  A grant with no entry predates versioning and counts as version 1. */
+  hooksConsentVersion?: Record<string, number>;
+  /** Derive agent task titles from prompts (tag line / first words) and, with
+   *  current consent, install the prompt hook. Machine-global like the hooks it
+   *  governs. Absent = true. */
+  taskTitleFromPrompt?: boolean;
 }
 
 const DEFAULT_ADAPTER_SETTINGS: AdapterSettings = {
@@ -67,7 +75,6 @@ const DEFAULT_ADAPTER_SETTINGS: AdapterSettings = {
   watchAllSessions: false,
   hooksInfoShown: false,
   showAreas: false,
-  taskTitleFromPrompt: true,
   areaMappings: {},
 };
 
@@ -82,6 +89,16 @@ function parseHooksConsent(raw: unknown): Record<string, HooksConsentState> {
   const out: Record<string, HooksConsentState> = {};
   for (const [providerId, state] of Object.entries(raw as Record<string, unknown>)) {
     if (state === 'granted' || state === 'declined') out[providerId] = state;
+  }
+  return out;
+}
+
+/** Coerce a loose object into the per-provider consent-version map, dropping non-integer values. */
+function parseHooksConsentVersion(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<string, number> = {};
+  for (const [providerId, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (Number.isInteger(v)) out[providerId] = v as number;
   }
   return out;
 }
@@ -149,10 +166,6 @@ function parseAdapterSettings(raw: unknown): AdapterSettings {
         : DEFAULT_ADAPTER_SETTINGS.hooksInfoShown,
     showAreas:
       typeof obj.showAreas === 'boolean' ? obj.showAreas : DEFAULT_ADAPTER_SETTINGS.showAreas,
-    taskTitleFromPrompt:
-      typeof obj.taskTitleFromPrompt === 'boolean'
-        ? obj.taskTitleFromPrompt
-        : DEFAULT_ADAPTER_SETTINGS.taskTitleFromPrompt,
     areaMappings: parseAreaMappings(obj.areaMappings),
   };
 }
@@ -179,6 +192,10 @@ export function readConfig(): PixelAgentsConfig {
         : [],
       hooksConsent: parseHooksConsent(parsed.hooksConsent),
       hooksEnabled: parseHooksEnabled(parsed.hooksEnabled),
+      hooksConsentVersion: parseHooksConsentVersion(parsed.hooksConsentVersion),
+      ...(typeof parsed.taskTitleFromPrompt === 'boolean'
+        ? { taskTitleFromPrompt: parsed.taskTitleFromPrompt }
+        : {}),
     };
   } catch (err) {
     console.error('[Pixel Agents] Failed to read config file:', err);
@@ -207,12 +224,48 @@ export function getHooksConsent(providerId: string): HooksConsentState | 'unansw
  *  beside the retracted hooks-off, and a later "Not Now" (which leaves the preference alone, since the grant never
  *  wrote it) ends at unanswered + hooks-off — an ask that never returns. A successful install persists hooks-on
  *  anyway, so this only changes the failure path. */
-export function grantHooksConsent(providerId: string): void {
+export function grantHooksConsent(providerId: string, version = HOOKS_CONSENT_VERSION): void {
   const cfg = readConfig();
-  if (cfg.hooksConsent[providerId] !== 'granted') {
+  const versions = (cfg.hooksConsentVersion ??= {});
+  if (cfg.hooksConsent[providerId] !== 'granted' || versions[providerId] !== version) {
     const replacingDecline = cfg.hooksConsent[providerId] === 'declined';
     cfg.hooksConsent[providerId] = 'granted';
+    versions[providerId] = version;
     if (replacingDecline) delete cfg.hooksEnabled[providerId];
+    writeConfig(cfg);
+  }
+}
+
+/** True when this provider's consent was granted against the CURRENT disclosure
+ *  (HOOKS_CONSENT_VERSION). Only that authorizes the scope the newer disclosure
+ *  added (the Claude prompt hook); an older grant still covers what it covered. */
+export function isHooksConsentCurrent(providerId: string): boolean {
+  const cfg = readConfig();
+  return (
+    cfg.hooksConsent[providerId] === 'granted' &&
+    (cfg.hooksConsentVersion?.[providerId] ?? LEGACY_HOOKS_CONSENT_VERSION) >= HOOKS_CONSENT_VERSION
+  );
+}
+
+/** A grant exists but predates the current disclosure, and the scope it lacks is
+ *  wanted (task titles from prompts on): the consent ask must be shown again. */
+export function needsHooksReconsent(providerId: string): boolean {
+  return (
+    getHooksConsent(providerId) === 'granted' &&
+    !isHooksConsentCurrent(providerId) &&
+    getTaskTitleFromPrompt()
+  );
+}
+
+/** The `taskTitleFromPrompt` setting. Absent = the default, true. */
+export function getTaskTitleFromPrompt(): boolean {
+  return readConfig().taskTitleFromPrompt ?? true;
+}
+
+export function persistTaskTitleFromPrompt(enabled: boolean): void {
+  const cfg = readConfig();
+  if (cfg.taskTitleFromPrompt !== enabled) {
+    cfg.taskTitleFromPrompt = enabled;
     writeConfig(cfg);
   }
 }
@@ -225,6 +278,7 @@ export function recordHooksDecline(providerId: string): void {
   if (cfg.hooksConsent[providerId] !== 'declined' || cfg.hooksEnabled[providerId] !== false) {
     cfg.hooksConsent[providerId] = 'declined';
     cfg.hooksEnabled[providerId] = false;
+    delete cfg.hooksConsentVersion?.[providerId];
     writeConfig(cfg);
   }
 }
@@ -237,6 +291,7 @@ export function clearHooksAnswer(providerId: string): void {
   if (providerId in cfg.hooksConsent || providerId in cfg.hooksEnabled) {
     delete cfg.hooksConsent[providerId];
     delete cfg.hooksEnabled[providerId];
+    delete cfg.hooksConsentVersion?.[providerId];
     writeConfig(cfg);
   }
 }
@@ -250,6 +305,7 @@ export function clearHooksConsent(providerId: string): void {
   const cfg = readConfig();
   if (providerId in cfg.hooksConsent) {
     delete cfg.hooksConsent[providerId];
+    delete cfg.hooksConsentVersion?.[providerId];
     writeConfig(cfg);
   }
 }
@@ -285,6 +341,7 @@ export function resetHooksConfig(): void {
   const cfg = readConfig();
   cfg.hooksConsent = {};
   cfg.hooksEnabled = {};
+  cfg.hooksConsentVersion = {};
   for (const ns of ['vscode', 'standalone'] as const) {
     cfg[ns].hooksInfoShown = DEFAULT_ADAPTER_SETTINGS.hooksInfoShown;
   }

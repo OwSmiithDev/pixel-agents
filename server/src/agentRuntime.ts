@@ -14,6 +14,11 @@ import * as path from 'path';
 
 import type { HookProvider } from '../../core/src/provider.js';
 import type { AgentStateStore } from './agentStateStore.js';
+import {
+  getHooksConsent,
+  getHooksEnabled,
+  persistTaskTitleFromPrompt,
+} from './configPersistence.js';
 import { DEFAULT_MAX_CONTEXT_TOKENS } from './constants.js';
 import { DismissalTracker } from './dismissalTracker.js';
 import {
@@ -89,7 +94,7 @@ export class AgentRuntime {
 
   constructor(
     private readonly store: AgentStateStore,
-    provider: HookProvider,
+    private readonly provider: HookProvider,
   ) {
     // Wire module-level dependencies
     setDismissalTracker(this.dismissalTracker);
@@ -289,6 +294,33 @@ export class AgentRuntime {
   }
 
   // ── Hook event routing ──
+
+  /**
+   * The `taskTitleFromPrompt` toggle, shared by both hosts: persist it
+   * (machine-global, like the hook it governs), sync the ref, drop prompt/tag
+   * titles when turning off, then re-apply an existing consented install so the
+   * prompt hook follows (removed when off; added when on AND consent is current).
+   * Never rejects.
+   */
+  async setTaskTitleFromPrompt(enabled: boolean): Promise<void> {
+    persistTaskTitleFromPrompt(enabled);
+    this.taskTitleFromPrompt.current = enabled;
+    if (!enabled) this.hookEventHandler.clearPromptTitles();
+    try {
+      if (
+        this.provider.refreshHooks &&
+        getHooksEnabled(this.provider.id) &&
+        getHooksConsent(this.provider.id) === 'granted' &&
+        (await this.provider.areHooksInstalled())
+      ) {
+        await this.provider.refreshHooks();
+      }
+    } catch (err) {
+      console.error(
+        `[Pixel Agents] Re-applying hooks for taskTitleFromPrompt failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 
   /** Route an incoming hook event to the appropriate agent. */
   handleHookEvent(providerId: string, event: Record<string, unknown>): void {

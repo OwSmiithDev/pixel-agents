@@ -282,21 +282,21 @@ describe('dist/cli.js entry-point guard', () => {
   });
 
   // An existing user whose hooks a pre-consent version installed gets ZERO
-  // friction: no prompt, just the migration. The startup install is the 14 -> 13
-  // migration and it only ever REDUCES scope (TaskCreated goes away;
-  // UserPromptSubmit, already installed, stays for task titles), so asking would buy
+  // friction: no prompt, just the migration. The startup install is the 14 -> 12
+  // migration and it only ever REDUCES scope (UserPromptSubmit and TaskCreated,
+  // the two events that forwarded prompt text, go away), so asking would buy
   // this user nothing they do not already have. What it must NOT do is take the
   // opportunity to touch anything else: unrelated settings keys and a
   // third-party hook sharing one of our entries both survive intact.
-  itBuilt('migrates a pre-consent install to 13 events with no prompt', async () => {
+  itBuilt('migrates a pre-consent install to 12 events with no prompt', async () => {
     const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'pxl-cli-legacy-'));
     const settingsPath = path.join(tmpHome, '.claude', 'settings.json');
     fs.mkdirSync(path.join(tmpHome, '.claude'), { recursive: true });
     // A legacy install: our command on every event we install today, plus the
-    // one we no longer do.
+    // two we no longer do.
     const ourCommand = `node "${path.join(tmpHome, '.pixel-agents', 'hooks', 'claude-hook.js')}"`;
     const thirdPartyCommand = 'node /elsewhere/other-tool.js';
-    const legacyEvents = [...CLAUDE_HOOK_EVENTS, 'TaskCreated'];
+    const legacyEvents = [...CLAUDE_HOOK_EVENTS, 'UserPromptSubmit', 'TaskCreated'];
     const hooks = Object.fromEntries(
       legacyEvents.map((event) => [
         event,
@@ -305,7 +305,7 @@ describe('dist/cli.js entry-point guard', () => {
     ) as Record<string, Array<{ matcher: string; hooks: Array<{ command: string }> }>>;
     // A third-party hook sharing the entry of an event we are dropping: the
     // sweep must take ours out of it and leave theirs.
-    hooks['TaskCreated'][0].hooks.unshift({ command: thirdPartyCommand });
+    hooks['UserPromptSubmit'][0].hooks.unshift({ command: thirdPartyCommand });
     fs.writeFileSync(
       settingsPath,
       JSON.stringify({ permissions: { allow: ['Bash(ls:*)'] }, hooks }, null, 2),
@@ -322,12 +322,14 @@ describe('dist/cli.js entry-point guard', () => {
         .map(([event]) => event)
         .sort();
       expect(ourEvents).toEqual([...CLAUDE_HOOK_EVENTS].sort());
-      expect(ourEvents).toContain('UserPromptSubmit');
+      expect(ourEvents).not.toContain('UserPromptSubmit');
       expect(ourEvents).not.toContain('TaskCreated');
       // Untouched neighbours: an unrelated top-level key, and the third-party
       // hook that shared the entry we swept.
       expect(after.permissions).toEqual({ allow: ['Bash(ls:*)'] });
-      expect(after.hooks['TaskCreated'][0].hooks).toEqual([{ command: thirdPartyCommand }]);
+      expect(after.hooks['UserPromptSubmit'][0].hooks).toEqual([{ command: thirdPartyCommand }]);
+      // TaskCreated held only ours -> emptied and the key removed entirely.
+      expect(after.hooks['TaskCreated']).toBeUndefined();
 
       const configPath = path.join(tmpHome, '.pixel-agents', 'config.json');
       const consent = (

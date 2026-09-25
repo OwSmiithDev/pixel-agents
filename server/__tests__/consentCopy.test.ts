@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CONSENT_DISCLOSURE,
+  CONSENT_EVENT_COUNT,
   CONSENT_INSTALL_HEADLINE,
 } from '../src/providers/hook/claude/consentCopy.js';
 import {
   CLAUDE_HOOK_EVENTS,
   SETTINGS_BACKUP_SUFFIX,
 } from '../src/providers/hook/claude/constants.js';
+
+it('counts the base events plus the prompt hook', () => {
+  expect(CONSENT_EVENT_COUNT).toBe(CLAUDE_HOOK_EVENTS.length + 1);
+});
 
 /**
  * The consent copy is two pieces: the HEADLINE is the greeter's welcome line
@@ -25,7 +30,7 @@ describe('consent copy', () => {
   it('carries all five disclosure facts', () => {
     const full = `${CONSENT_INSTALL_HEADLINE}\n\n${CONSENT_DISCLOSURE}`;
     expect(full).toContain('~/.claude/settings.json');
-    expect(full).toContain(`${CLAUDE_HOOK_EVENTS.length.toString()} Claude Code events`);
+    expect(full).toContain(`${CONSENT_EVENT_COUNT.toString()} Claude Code events`);
     expect(full).toContain('your existing settings are kept');
     expect(full).toContain(`settings.json${SETTINGS_BACKUP_SUFFIX}`);
     expect(full).toContain('tool names, tool inputs and your prompts');
@@ -40,9 +45,7 @@ describe('consent copy', () => {
   // surface renders its title.
   it('keeps every disclosure fact in the shared block, not the headline', () => {
     expect(CONSENT_DISCLOSURE).toContain('~/.claude/settings.json');
-    expect(CONSENT_DISCLOSURE).toContain(
-      `${CLAUDE_HOOK_EVENTS.length.toString()} Claude Code events`,
-    );
+    expect(CONSENT_DISCLOSURE).toContain(`${CONSENT_EVENT_COUNT.toString()} Claude Code events`);
     expect(CONSENT_DISCLOSURE).toContain(`settings.json${SETTINGS_BACKUP_SUFFIX}`);
     expect(CONSENT_DISCLOSURE).toContain('tool names, tool inputs and your prompts');
     expect(CONSENT_DISCLOSURE).toContain('127.0.0.1');

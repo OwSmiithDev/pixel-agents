@@ -4,6 +4,7 @@ import * as path from 'path';
 
 import { normalizeProjectPath } from '../../../../../core/src/normalizeProjectPath.js';
 import type { AgentEvent, HookProvider, TodoSignal } from '../../../../../core/src/provider.js';
+import { getTaskTitleFromPrompt, isHooksConsentCurrent } from '../../../configPersistence.js';
 import {
   BASH_COMMAND_DISPLAY_MAX_LENGTH,
   TASK_DESCRIPTION_DISPLAY_MAX_LENGTH,
@@ -18,6 +19,7 @@ import { claudeTeamProvider } from './claudeTeamProvider.js';
 import { CONSENT_DISCLOSURE, CONSENT_INSTALL_HEADLINE } from './consentCopy.js';
 import {
   CLAUDE_LARGE_CONTEXT_WINDOW,
+  CLAUDE_PROMPT_HOOK_EVENT,
   CLAUDE_SMALL_CONTEXT_MODEL_PATTERN,
   CLAUDE_SMALL_CONTEXT_WINDOW,
   CLAUDE_TERMINAL_NAME_PREFIX,
@@ -286,7 +288,15 @@ function normalizeHookEvent(
 /** Async so an installer throw (e.g. unparseable settings.json) always reaches
  *  callers as a rejection they can surface, never a sync throw. */
 async function installHooks(_serverUrl: string, _authToken: string): Promise<void> {
-  await installerInstallHooks();
+  await installerInstallHooks(optionalHookEvents());
+}
+
+/** The prompt hook rides along only with current consent AND the setting on
+ *  (see CLAUDE_PROMPT_HOOK_EVENT); read fresh on every install. */
+function optionalHookEvents(): string[] {
+  return isHooksConsentCurrent('claude') && getTaskTitleFromPrompt()
+    ? [CLAUDE_PROMPT_HOOK_EVENT]
+    : [];
 }
 
 async function uninstallHooks(): Promise<void> {
@@ -333,6 +343,7 @@ export const claudeProvider: HookProvider = {
   normalizeHookEvent,
 
   installHooks,
+  refreshHooks: () => installerInstallHooks(optionalHookEvents()),
   uninstallHooks,
   areHooksInstalled,
   consentDisclosure,

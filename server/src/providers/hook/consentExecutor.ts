@@ -9,6 +9,7 @@ import {
   clearHooksAnswer,
   clearHooksConsent,
   getHooksConsent,
+  isHooksConsentCurrent,
   recordHooksDecline,
 } from '../../configPersistence.js';
 import { consentActionFor } from './consentGate.js';
@@ -37,6 +38,9 @@ export interface ConsentEffects {
   syncHooksPreferenceOff(): void;
   /** Broadcast the re-derived install state to the webview. */
   reportHooksStatus(): Promise<void>;
+  /** The surface's `taskTitleFromPrompt` toggle path (persist, sync, clear
+   *  titles, re-apply hooks). Never rejects. */
+  setTaskTitleFromPrompt(enabled: boolean): Promise<void>;
 }
 
 /**
@@ -80,8 +84,9 @@ async function runConsentChoice(
   // uninstall on a guess.
   const installed = await effects.areHooksInstalled().catch(() => false);
   const consent = getHooksConsent(providerId);
+  const outdated = consent === 'granted' && !isHooksConsentCurrent(providerId);
 
-  switch (consentActionFor(choice, { installed, consent })) {
+  switch (consentActionFor(choice, { installed, consent, outdated })) {
     case 'install':
       // Clicking Install IS the consent grant, exactly like the Settings
       // toggle — so it takes that same path, which grants, installs, then
@@ -149,6 +154,13 @@ async function runConsentChoice(
       effects.syncHooksPreferenceOff();
       console.log('[Pixel Agents] Hooks disabled. Re-enable them any time in the UI settings.');
       await effects.reportHooksStatus();
+      break;
+
+    case 'declinePrompt':
+      // "Don't ask again" on a re-consent ask: keep the hooks the old grant
+      // covers, turn off the scope it does not (which also retires the ask).
+      await effects.setTaskTitleFromPrompt(false);
+      console.log('[Pixel Agents] Task titles from prompts turned off; hooks unchanged.');
       break;
 
     case 'none':

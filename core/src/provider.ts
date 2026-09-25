@@ -101,6 +101,10 @@ export interface HookProvider {
 
   /** Install hook scripts that POST to our server. */
   installHooks(serverUrl: string, authToken: string): Promise<void>;
+  /** Re-apply an EXISTING install so optional events follow the current
+   *  consent/settings (adds or sweeps them). Callers only use it when hooks are
+   *  already installed with consent. */
+  refreshHooks?(): Promise<void>;
   /** Remove installed hook scripts. */
   uninstallHooks(): Promise<void>;
   /** Check if hooks are currently installed. */

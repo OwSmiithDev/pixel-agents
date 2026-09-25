@@ -47,6 +47,15 @@ export const GLOBAL_SCAN_ACTIVE_MIN_SIZE = 3_072; // 3KB
 /** Only adopt global JSONL files modified within this window */
 export const GLOBAL_SCAN_ACTIVE_MAX_AGE_MS = 600_000; // 10 minutes
 
+// ── Hooks consent versioning (server/src/configPersistence.ts) ──
+/** Version of the hooks consent disclosure. Bump whenever a disclosure WIDENS
+ *  what is collected, so grants given against the older text stop authorizing
+ *  the new scope and the ask is shown again. 2 = prompts (UserPromptSubmit). */
+export const HOOKS_CONSENT_VERSION = 2;
+/** Version assumed for a grant recorded before versioning, and the one recorded
+ *  when consent is granted silently (pre-consent install migration). */
+export const LEGACY_HOOKS_CONSENT_VERSION = 1;
+
 // ── Task titles (server/src/taskTitle.ts) ───────────────────
 /** Max characters of a derived task title (ellipsis included). */
 export const TASK_TITLE_MAX_LENGTH = 60;

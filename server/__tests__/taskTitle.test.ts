@@ -4,7 +4,10 @@ import { resendAgentActivity } from '../src/agentActivityResend.js';
 import { AgentStateStore } from '../src/agentStateStore.js';
 import { HookEventHandler } from '../src/hookEventHandler.js';
 import { claudeProvider, todoSignalFromTool } from '../src/providers/hook/claude/claude.js';
-import { CLAUDE_HOOK_EVENTS } from '../src/providers/hook/claude/constants.js';
+import {
+  CLAUDE_HOOK_EVENTS,
+  CLAUDE_PROMPT_HOOK_EVENT,
+} from '../src/providers/hook/claude/constants.js';
 import { SessionRouter } from '../src/sessionRouter.js';
 import { deriveTitleFromPrompt, sanitizeTitle } from '../src/taskTitle.js';
 import type { AgentState } from '../src/types.js';
@@ -139,8 +142,9 @@ describe('todoSignalFromTool', () => {
 });
 
 describe('CLAUDE_HOOK_EVENTS', () => {
-  it('installs UserPromptSubmit (title derivation) but still not TaskCreated', () => {
-    expect(CLAUDE_HOOK_EVENTS).toContain('UserPromptSubmit');
+  it('UserPromptSubmit is optional (consent + setting gated), TaskCreated never installed', () => {
+    expect(CLAUDE_HOOK_EVENTS).not.toContain('UserPromptSubmit');
+    expect(CLAUDE_PROMPT_HOOK_EVENT).toBe('UserPromptSubmit');
     expect(CLAUDE_HOOK_EVENTS).not.toContain('TaskCreated');
   });
 });
@@ -275,6 +279,41 @@ describe('agentTask via HookEventHandler', () => {
     expect(tasks()).toHaveLength(0);
     tool('TodoWrite', { todos: [{ content: 'Visible todo', status: 'in_progress' }] });
     expect(tasks()).toEqual([{ type: 'agentTask', id: 1, title: 'Visible todo', source: 'todo' }]);
+  });
+
+  it('clearPromptTitles drops prompt/tag titles (todo stays) and nothing cleared is replayed', () => {
+    agents.set(2, createTestAgent({ id: 2, sessionId: 'sess-2' }));
+    handler.registerAgent('sess-2', 2);
+    prompt('TASK: Secretive tag');
+    handler.handleEvent('claude', {
+      hook_event_name: 'UserPromptSubmit',
+      session_id: 'sess-2',
+      prompt: 'plain words here',
+    });
+    handler.handleEvent('claude', {
+      hook_event_name: 'PreToolUse',
+      session_id: 'sess-2',
+      tool_name: 'TodoWrite',
+      tool_input: { todos: [{ content: 'Todo stays', status: 'in_progress' }] },
+    });
+    messages.length = 0;
+
+    handler.clearPromptTitles();
+    expect(tasks()).toEqual([{ type: 'agentTask', id: 1, title: null, source: 'tag' }]);
+
+    const sent: Array<Record<string, unknown>> = [];
+    resendAgentActivity((m) => sent.push(m), agents);
+    expect(sent.filter((m) => m.type === 'agentTask')).toEqual([
+      { type: 'agentTask', id: 2, title: 'Todo stays', source: 'todo' },
+    ]);
+
+    // A prompt-only title is cleared too.
+    messages.length = 0;
+    tool('TodoWrite', { todos: [] });
+    fromPrompt.current = true;
+    prompt('only a prompt');
+    handler.clearPromptTitles();
+    expect(tasks().at(-1)).toEqual({ type: 'agentTask', id: 1, title: null, source: 'prompt' });
   });
 
   it('a newly connected client gets the current title replayed', () => {

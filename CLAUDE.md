@@ -196,8 +196,8 @@ Adding a new CLI integration is one subdirectory under `server/src/providers/hoo
 
 `core/asyncapi.yaml` is the contract. Pinned to **3.0.0** because `@asyncapi/modelina@5.10.1` declares `supportedVersions: ['3.0.0']` only; bumping to 3.1.0 produces `export type Root = any`. Revisit when Modelina ships 3.1.0 support.
 
-- **27 ServerMessage variants** (server → client): agent lifecycle, agent activity, sub-agent activity, team + context usage, assets, settings + workspace, diagnostics.
-- **18 ClientMessage variants** (client → server): lifecycle (`webviewReady`, `launchAgent`, `focusAgent`, `closeAgent`), layout (`saveAgentSeats`, `saveLayout`, `exportLayout`, `importLayout`), settings (`setSoundEnabled`, `setHooksEnabled`, `setWatchAllSessions`, `setAlwaysShowLabels`, `setHooksInfoShown`, `setLastSeenVersion`), discovery + assets, diagnostics.
+- **ServerMessage variants** (server → client): agent lifecycle, agent activity (incl. `agentTask` task titles), sub-agent activity, team + context usage, assets, settings + workspace, diagnostics.
+- **ClientMessage variants** (client → server): lifecycle (`webviewReady`, `launchAgent`, `focusAgent`, `closeAgent`), layout (`saveAgentSeats`, `saveLayout`, `exportLayout`, `importLayout`), settings (`setSoundEnabled`, `setHooksEnabled`, `setWatchAllSessions`, `setAlwaysShowLabels`, `setHooksInfoShown`, `setLastSeenVersion`, `setTaskTitleFromPrompt`), discovery + assets, diagnostics. Exact counts: the `oneOf` lists in `core/asyncapi.yaml`.
 
 Both unions use `oneOf` with `discriminator: type`. Every concrete message sets `additionalProperties: false`.
 
@@ -323,7 +323,7 @@ Per-agent runtime data: provider reference, session key, transcript-fallback fie
 
 ```
 ~/.pixel-agents/
-  config.json              { vscode, standalone, externalAssetDirectories, hooksConsent, hooksEnabled (both per-provider) }
+  config.json              { vscode, standalone, externalAssetDirectories, hooksConsent, hooksEnabled, hooksConsentVersion (per-provider), taskTitleFromPrompt (machine-global) }
   vscode-state.json        { agents, seats }
   standalone-state.json    { agents, seats }
   layout.json              OfficeLayout (shared across surfaces)
@@ -347,10 +347,10 @@ JSONL transcripts at `~/.claude/projects/<project-hash>/<session-id>.jsonl`. Pro
 
 ### Dual-mode detection
 
-| Mode                     | Source                                                 | Detection                                                                                                                                                                                                                                                                         |
-| ------------------------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Hooks** (preferred)    | Claude Code Hooks API → HTTP POST → `HookEventHandler` | Instant, reliable. Installed events are `CLAUDE_HOOK_EVENTS`. `UserPromptSubmit`/`TaskCreated` are deliberately NOT installed — they normalize to null, so installing them only forwarded prompt text to be dropped; `normalizeHookEvent` still tolerates them for stale installs |
-| **Heuristic** (fallback) | Polling JSONL files                                    | Per-agent 500 ms JSONL polling for /clear detection; 1 s main scanner for terminal adoption; 3 s external scanner; 30 s stale check. Content-based /clear detection (`/clear</command-name>` in first 8 KB)                                                                       |
+| Mode                     | Source                                                 | Detection                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Hooks** (preferred)    | Claude Code Hooks API → HTTP POST → `HookEventHandler` | Instant, reliable. Installed events are `CLAUDE_HOOK_EVENTS` plus, optionally, `UserPromptSubmit` (`CLAUDE_PROMPT_HOOK_EVENT`): only with consent at the current `HOOKS_CONSENT_VERSION` AND `taskTitleFromPrompt` on, else the install sweeps it. It feeds `agentTask` titles; the prompt is reduced to a ≤60-char title at normalization and never kept. Older grants trigger a re-consent ask (`needsHooksReconsent`). `TaskCreated` is deliberately NOT installed (normalizes to null; tolerated for stale installs) |
+| **Heuristic** (fallback) | Polling JSONL files                                    | Per-agent 500 ms JSONL polling for /clear detection; 1 s main scanner for terminal adoption; 3 s external scanner; 30 s stale check. Content-based /clear detection (`/clear</command-name>` in first 8 KB)                                                                                                                                                                                                                                                                                                              |
 
 The `hookDelivered` flag (per agent) and `hooksEnabled` (global) gate timer logic. JSONL polling always runs in both modes for tool content (status text, animations); only permission (7 s) and text-idle (5 s) timers are suppressed by `hookDelivered`.
 

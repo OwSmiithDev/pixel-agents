@@ -24,6 +24,10 @@ export interface ConsentGateState {
    *  server token. Showing the dialog to a client whose answer would be
    *  ignored is a lie, so it gates the ASK and not just the response. */
   privileged: boolean;
+  /** A grant exists but predates the current disclosure while the scope it
+   *  lacks is wanted (needsHooksReconsent): ask again even though installed and
+   *  answered. Absent = false. */
+  reconsent?: boolean;
 }
 
 /**
@@ -36,9 +40,8 @@ export function hooksConsentRequest(
   state: ConsentGateState,
   provider: Pick<HookProvider, 'id' | 'consentDisclosure'>,
 ): HooksConsentRequest | null {
-  if (state.installed || state.consentAnswered || !state.hooksEnabled || !state.privileged) {
-    return null;
-  }
+  if (!state.hooksEnabled || !state.privileged) return null;
+  if (!state.reconsent && (state.installed || state.consentAnswered)) return null;
   const { headline, disclosure } = provider.consentDisclosure();
   return { type: 'hooksConsentRequest', providerId: provider.id, headline, disclosure };
 }
@@ -48,7 +51,7 @@ export function hooksConsentRequest(
  *  UNDOES what the earlier answer left (hooks on disk, a recorded grant, or a decline's own hooks-off). Rationale and
  *  rejected alternatives: docs/adr/0001; consentExecutor.ts performs each arm. */
 export type ConsentAction =
-  'install' | 'persistOff' | 'disable' | 'revert' | 'revertDecline' | 'none';
+  'install' | 'persistOff' | 'disable' | 'revert' | 'revertDecline' | 'declinePrompt' | 'none';
 
 /** What an earlier answer may have left behind, as the surface reads it when
  *  the next answer arrives. */
@@ -62,6 +65,11 @@ export interface ConsentRevisionState {
    *  fail; keying the revert off `installed` stranded exactly that user), and `declined` carries the provenance that
    *  the persisted hooks-off was the ANSWER's own write, which a revised "not now" takes back with it. */
   consent: 'granted' | 'declined' | 'unanswered';
+  /** The grant predates the current disclosure (a re-consent ask). Its answer is
+   *  about the added scope only: Install upgrades the grant, "never" turns the
+   *  added scope off (task titles from prompts), "not now" changes nothing — the
+   *  hooks the old grant covered stay. */
+  outdated?: boolean;
 }
 
 /**
@@ -71,6 +79,9 @@ export interface ConsentRevisionState {
  */
 export function consentActionFor(choice: unknown, state: ConsentRevisionState): ConsentAction {
   if (choice === 'install') return 'install';
+  if (state.outdated && state.consent === 'granted') {
+    return choice === 'never' ? 'declinePrompt' : 'none';
+  }
   if (choice === 'never') return state.installed ? 'disable' : 'persistOff';
   if (choice === 'notNow') {
     if (state.consent === 'declined') return 'revertDecline';

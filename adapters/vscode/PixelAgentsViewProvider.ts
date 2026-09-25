@@ -29,11 +29,14 @@ import { loadAllCharacters, loadAllFurniture, loadAllPets } from '../../server/s
 import {
   getHooksConsent,
   getHooksEnabled,
+  getTaskTitleFromPrompt,
   grantHooksConsent,
+  needsHooksReconsent,
   readConfig,
   setHooksEnabled as persistHooksEnabled,
   writeConfig,
 } from '../../server/src/configPersistence.js';
+import { LEGACY_HOOKS_CONSENT_VERSION } from '../../server/src/constants.js';
 import { setFolderNameResolver, setTerminalAdapter } from '../../server/src/fileWatcher.js';
 import type { LayoutWatcher } from '../../server/src/layoutPersistence.js';
 import {
@@ -354,9 +357,11 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
    *    version installed them silently — consent is granted here and the
    *    install runs with no prompt at all. That install is the 14 -> 12
    *    migration, and it only ever REDUCES scope: it drops UserPromptSubmit
-   *    and TaskCreated, the two events that forwarded prompt text and were
-   *    consumed by nothing. Nothing this user already had is expanded, so the
-   *    friction of a prompt buys them nothing they do not already have.
+   *    and TaskCreated. The silent grant is recorded at the LEGACY consent
+   *    version, so it never authorizes the prompt hook — that needs the
+   *    re-consent ask (needsHooksReconsent). Nothing this user already had is
+   *    expanded, so the friction of a prompt buys them nothing they do not
+   *    already have.
    *    (This is deliberately NOT the general rule: consent for a fresh
    *    install is still asked for, in full, in the app.)
    *
@@ -368,8 +373,9 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
       if (!(await claudeProvider.areHooksInstalled())) {
         return; // fresh install — the webview consent dialog owns this ask
       }
-      // Already installed and already firing: grant and migrate silently.
-      grantHooksConsent(claudeProvider.id);
+      // Already installed and already firing: grant and migrate silently, at
+      // the legacy version (it does not cover the prompt hook).
+      grantHooksConsent(claudeProvider.id, LEGACY_HOOKS_CONSENT_VERSION);
     }
     await this.installHooksAndScript(claudeProvider, port, token);
     // Truthful success report for THIS path: a webviewReady handshake that
@@ -403,6 +409,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         }
       },
       reportHooksStatus: () => this.reportHooksStatus(provider),
+      setTaskTitleFromPrompt: (enabled) => this.runtime.setTaskTitleFromPrompt(enabled),
     };
   }
 
@@ -502,6 +509,10 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         const cfg = readConfig();
         cfg.vscode.areaMappings = mappings;
         writeConfig(cfg);
+      } else if (message.type === 'setTaskTitleFromPrompt') {
+        // Embedded webview = privileged by construction. Persists, syncs the
+        // runtime ref, clears prompt titles when off, re-applies the hooks.
+        void this.runtime.setTaskTitleFromPrompt(message.enabled === true);
       } else if (message.type === 'setWatchAllSessions') {
         const enabled = message.enabled as boolean;
         this.adapter.setSetting(GLOBAL_KEY_WATCH_ALL_SESSIONS, enabled);
@@ -579,6 +590,8 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           false,
         );
         this.runtime.watchAllSessions.current = watchAllSessions;
+        const taskTitleFromPrompt = getTaskTitleFromPrompt();
+        this.runtime.taskTitleFromPrompt.current = taskTitleFromPrompt;
         // settingsLoaded.hooksEnabled stays a single boolean carrying the
         // CLAUDE provider's preference until the Settings UI grows a
         // per-provider list — its sole webview reader is the hooks tooltip.
@@ -598,6 +611,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           hooksInfoShown,
           externalAssetDirectories: config.externalAssetDirectories,
           showAreas,
+          taskTitleFromPrompt,
         });
 
         // One status + at most one consent ask PER PROVIDER. Install state is distinct from the hooksEnabled
@@ -627,6 +641,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
               hooksEnabled: getHooksEnabled(provider.id),
               consentAnswered: getHooksConsent(provider.id) !== 'unanswered',
               privileged: true,
+              reconsent: needsHooksReconsent(provider.id),
             },
             provider,
           );
