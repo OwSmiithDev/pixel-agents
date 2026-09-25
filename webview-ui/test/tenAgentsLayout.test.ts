@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { AUTO_ON_FACING_DEPTH } from '../src/constants.js';
+
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const assetsDir = path.resolve(rootDir, '../public/assets');
 const layoutPath = path.resolve(rootDir, '../../layouts/smiith-10-agentes.json');
@@ -133,11 +135,24 @@ function collectPcTiles(): Set<string> {
   return tiles;
 }
 
-// Faces electronics if the adjacent tile in the facing direction, or the next one, is a PC tile.
+// Mirrors officeState.ts `isSeatFacingElectronics` exactly: scans depth 1..AUTO_ON_FACING_DEPTH
+// along the facing direction, plus the perpendicular ±1 tiles at each depth.
 function facesElectronics(seat: SeatTile, pcTiles: Set<string>): boolean {
   const [dc, dr] = OFFSET[seat.facing];
-  for (const d of [1, 2]) {
-    if (pcTiles.has(`${seat.col + dc * d},${seat.row + dr * d}`)) return true;
+  for (let d = 1; d <= AUTO_ON_FACING_DEPTH; d++) {
+    const tileCol = seat.col + dc * d;
+    const tileRow = seat.row + dr * d;
+    if (pcTiles.has(`${tileCol},${tileRow}`)) return true;
+    if (dc !== 0) {
+      if (pcTiles.has(`${tileCol},${tileRow - 1}`) || pcTiles.has(`${tileCol},${tileRow + 1}`)) {
+        return true;
+      }
+    } else if (
+      pcTiles.has(`${tileCol - 1},${tileRow}`) ||
+      pcTiles.has(`${tileCol + 1},${tileRow}`)
+    ) {
+      return true;
+    }
   }
   return false;
 }
