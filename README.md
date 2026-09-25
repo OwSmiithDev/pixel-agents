@@ -76,6 +76,7 @@ Depois de instalar, feche e reabra o VS Code e aceite a instalação dos hooks n
 | `webview-ui/src/constants.ts`                    | Cores e parâmetros do 3D (`THREE_*`) — ângulo de câmera, luzes, bloom |
 | `scripts/layouts/smiith-tech.mjs`                | Gerador do layout Smiith Tech (salas como retângulos)                 |
 | `webview-ui/public/assets/default-layout-2.json` | Layout gerado, usado como padrão                                      |
+| `layouts/smiith-10-agentes.json`                 | Template de 10 agentes (Settings → Import Layout)                     |
 | `docs/superpowers/specs/`                        | Design e decisões técnicas                                            |
 
 Para ajustar o layout, edite o gerador e rode `node scripts/layouts/smiith-tech.mjs`.
