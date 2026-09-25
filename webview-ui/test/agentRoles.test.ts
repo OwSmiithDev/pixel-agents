@@ -65,7 +65,7 @@ describe('roles and labels', () => {
     assert.equal(os.getAgentLabel(6), 'Agente 02');
   });
 
-  test('overflow agents are labelled and can inherit the IDE role', () => {
+  test('overflow agents get an Agente NN label', () => {
     const os = office([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
     assert.deepEqual(os.getOverflowAgentIds(), [11]);
     assert.equal(os.getAgentLabel(11), 'Agente 10');
@@ -84,14 +84,40 @@ describe('roles and labels', () => {
     for (const id of [2, 3]) assert.notEqual(os.characters.get(id)!.seatId, 'work-ide');
   });
 
-  test('a non-IDE agent does not reclaim a persisted IDE-area seat', () => {
-    const os = office([1]);
-    os.addAgent(2, 0, 0, 'work-agent-01', true);
+  test('a non-IDE agent does not claim a persisted IDE seat reserved for a waiting IDE', () => {
+    // IDE 20 is waiting in overflow (no seat) → the IDE seat stays reserved for it
+    const os = new OfficeState(userLayout());
+    os.addAgent(20, 0, 0, 'work-agent-01', true); // IDE, seated outside the IDE area
+    os.removeAgent(20);
+    os.addAgent(2, 0, 0, undefined, true); // IDE by hand-off, no seat yet → placed in IDE area
+    assert.equal(os.characters.get(2)!.seatId, 'work-ide');
+    os.addAgent(3, 0, 0, 'work-ide', true); // stale persisted IDE seat, already taken
+    assert.notEqual(os.characters.get(3)!.seatId, 'work-ide');
+  });
+
+  test('IDE hand-off frees the IDE seat for everyone: a waiting agent is promoted', () => {
+    const os = office([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    assert.equal(os.characters.get(1)!.seatId, 'work-ide');
+    assert.deepEqual(os.getOverflowAgentIds(), [11]);
     os.removeAgent(1);
     finishDespawns(os);
-    // agent 2 is now IDE but keeps its seat; a new agent with a stale IDE seat skips it
-    os.addAgent(3, 0, 0, 'work-ide', true);
-    assert.notEqual(os.characters.get(3)!.seatId, 'work-ide');
+    // agent 2 is IDE now but keeps its seat (no reseating) → work-ide is an ordinary seat
+    assert.equal(os.getAgentLabel(2), 'IDE');
+    assert.notEqual(os.characters.get(2)!.seatId, 'work-ide');
+    assert.deepEqual(os.getOverflowAgentIds(), []);
+    assert.equal(os.characters.get(11)!.seatId, 'work-ide');
+  });
+
+  test('a waiting IDE gets the reserved IDE seat even behind an older waiting agent', () => {
+    const os = office([20, 21, 22, 23, 24, 25, 26, 27, 28, 29]);
+    os.addAgent(30, 0, 0, undefined, true);
+    os.addAgent(3, 0, 0, undefined, true);
+    assert.deepEqual(os.getOverflowAgentIds(), [30, 3]);
+    os.removeAgent(20);
+    assert.equal(os.getAgentLabel(3), 'IDE', 'lowest live id inherits the role');
+    finishDespawns(os);
+    assert.equal(os.characters.get(3)?.seatId, 'work-ide');
+    assert.deepEqual(os.getOverflowAgentIds(), [30]);
   });
 });
 

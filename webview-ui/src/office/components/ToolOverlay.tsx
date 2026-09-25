@@ -266,6 +266,9 @@ export function ToolOverlay({
               >
                 {text}
               </span>
+              {/* Team role stays in the DOM (screen readers, e2e text match)
+                  without widening the one-line compact label. */}
+              {teamRoleLabel && <span className="sr-only"> · {teamRoleLabel}</span>}
             </>
           );
         } else {

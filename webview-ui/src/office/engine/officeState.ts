@@ -84,6 +84,8 @@ export interface WorkSeatQuery {
   near?: { col: number; row: number };
   /** Allow seats inside an area labeled IDE (reserved for the IDE role) */
   allowIde?: boolean;
+  /** Take a free IDE-area seat first (the IDE role itself) */
+  preferIde?: boolean;
 }
 
 /** Internal helper: facing-tile coords for a seat. Returns null for invalid direction. */
@@ -223,9 +225,7 @@ export class OfficeState {
             ? anchorTile(this.characters.get(ch.parentAgentId), this.seats)
             : undefined;
         ch.seatId = this.claimSeat(
-          this.findFreeWorkSeat(
-            near ? { near } : { folderName: ch.folderName, allowIde: this.isIdeAgent(ch.id) },
-          ),
+          this.findFreeWorkSeat(this.workSeatQuery(ch.id, near, ch.folderName)),
           true,
         );
       }
@@ -346,7 +346,7 @@ export class OfficeState {
 
   /**
    * Free work seat for an agent, or null. Seats in an `IDE` area are skipped
-   * unless `allowIde` (the IDE role), which then prefers them. With `near`, the closest seat wins;
+   * unless `allowIde`; `preferIde` takes them first. With `near`, the closest seat wins;
    * otherwise the 3-stage folder/Area picker (mapped Areas → unzoned → any).
    */
   findFreeWorkSeat(opts: WorkSeatQuery = {}): string | null {
@@ -358,7 +358,7 @@ export class OfficeState {
     if (free.length === 0) return null;
     if (opts.near) return this.closestOf(free, opts.near);
     // The IDE role prefers its own area when a seat there is free
-    const ideSeat = opts.allowIde && free.find((uid) => this.seatInArea(uid, [IDE_AREA_LABEL]));
+    const ideSeat = opts.preferIde && free.find((uid) => this.seatInArea(uid, [IDE_AREA_LABEL]));
     if (ideSeat) return ideSeat;
 
     const pick = (uids: string[]) =>
@@ -582,20 +582,14 @@ export class OfficeState {
     const anchorId = e.parentAgentId ?? e.nearAgentId;
     const anchorAt =
       anchorId !== undefined ? anchorTile(this.characters.get(anchorId), this.seats) : undefined;
-    const isIde = this.isIdeAgent(e.id);
-    // Only the IDE may (re)claim a seat in the IDE area
+    const query = this.workSeatQuery(e.id, anchorAt, e.folderName);
+    // A reserved IDE-area seat is never (re)claimed by anyone but the IDE
     const preferred =
-      e.preferredSeatId && (isIde || !this.seatInArea(e.preferredSeatId, [IDE_AREA_LABEL]))
+      e.preferredSeatId && (query.allowIde || !this.seatInArea(e.preferredSeatId, [IDE_AREA_LABEL]))
         ? e.preferredSeatId
         : undefined;
     const seatId =
-      this.claimSeat(preferred, true) ??
-      this.claimSeat(
-        this.findFreeWorkSeat(
-          anchorAt ? { near: anchorAt } : { folderName: e.folderName, allowIde: isIde },
-        ),
-        true,
-      );
+      this.claimSeat(preferred, true) ?? this.claimSeat(this.findFreeWorkSeat(query), true);
     if (!seatId) return false;
 
     const parent = e.parentAgentId !== undefined ? this.characters.get(e.parentAgentId) : undefined;
@@ -621,9 +615,30 @@ export class OfficeState {
     return true;
   }
 
-  /** Promote overflow agents, oldest first, while work seats are free. */
+  /** Promote overflow agents, oldest first. Every entry is tried: a seat only
+   *  some entries may take (a reserved IDE seat) must not block the rest. */
   private promoteOverflow(): void {
-    while (this.overflow.length > 0 && this.place(this.overflow[0])) this.overflow.shift();
+    this.overflow = this.overflow.filter((e) => !this.place(e));
+  }
+
+  /**
+   * IDE-area seats are reserved for the IDE role while the IDE has no seat or
+   * already sits in the IDE area. After a hand-off the new IDE keeps its seat
+   * (no reseating), so the IDE-area seats become ordinary work seats.
+   */
+  private ideSeatReserved(): boolean {
+    const ide = this.ideAgentId === null ? undefined : this.characters.get(this.ideAgentId);
+    return !ide?.seatId || this.seatInArea(ide.seatId, [IDE_AREA_LABEL]);
+  }
+
+  private workSeatQuery(
+    id: number,
+    near: { col: number; row: number } | undefined,
+    folderName: string | undefined,
+  ): WorkSeatQuery {
+    const isIde = this.isIdeAgent(id);
+    const allowIde = isIde || !this.ideSeatReserved();
+    return near ? { near, allowIde } : { folderName, allowIde, preferIde: isIde };
   }
 
   private dropOverflow(id: number): boolean {
