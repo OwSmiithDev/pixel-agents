@@ -495,6 +495,7 @@ export class OfficeState {
     folderName?: string,
     nearAgentId?: number,
     preferredRestSeatId?: string,
+    isActive = true,
   ): void {
     this.assignRole(id);
     const existing = this.characters.get(id);
@@ -525,7 +526,7 @@ export class OfficeState {
       preferredSeatId,
       preferredRestSeatId,
       nearAgentId,
-      isActive: true,
+      isActive,
       isHeadless: false,
     };
     if (!this.place(entry, skipSpawnEffect)) this.overflow.push(entry);
@@ -601,6 +602,10 @@ export class OfficeState {
       parent?.hueShift ?? e.hueShift,
     );
     ch.isActive = e.isActive;
+    // Created idle (never had an active→inactive edge to arm this): start the
+    // same rest countdown setAgentActive(false) would, so it still goes to
+    // its rest seat instead of sitting at the PC forever.
+    if (!e.isActive) ch.seatTimer = REST_DELAY_SEC;
     if (e.isHeadless) ch.isHeadless = true;
     if (e.folderName) ch.folderName = e.folderName;
     if (e.team) Object.assign(ch, e.team);

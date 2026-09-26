@@ -347,6 +347,58 @@ describe('rest routine', () => {
   });
 });
 
+describe('created idle', () => {
+  test('agent created idle waits, then walks to its rest seat', () => {
+    const os = new OfficeState(userLayout());
+    os.addAgent(1, 0, 0, 'work-agent-05', true, undefined, undefined, undefined, false);
+    const c = ch(os, 1);
+    assert.equal(c.isActive, false);
+    assert.equal(c.state, CharacterState.TYPE, 'seated at the PC right after creation');
+    step(os, REST_DELAY_SEC - 0.2);
+    assert.equal(c.state, CharacterState.TYPE, 'still at the PC before the delay');
+    step(os, 0.4);
+    assert.equal(c.state, CharacterState.WALK, 'left for the lounge after the delay');
+    step(os, 30);
+    assert.equal(c.state, CharacterState.REST);
+    assert.equal(tileOf(c), seatTile(os, c.restSeatId!));
+  });
+
+  test('created idle then activated before the delay → never rests, sits at the PC typing', () => {
+    const os = new OfficeState(userLayout());
+    os.addAgent(1, 0, 0, 'work-agent-05', true, undefined, undefined, undefined, false);
+    step(os, REST_DELAY_SEC - 0.5);
+    os.setAgentActive(1, true);
+    step(os, 30);
+    const c = ch(os, 1);
+    assert.equal(c.state, CharacterState.TYPE);
+    assert.equal(tileOf(c), seatTile(os, 'work-agent-05'));
+  });
+
+  test('restored agent (skipSpawnEffect) that is idle also rests', () => {
+    const os = new OfficeState(userLayout());
+    os.addAgent(1, 0, 0, undefined, true, undefined, undefined, undefined, false);
+    const c = ch(os, 1);
+    assert.equal(c.matrixEffect, null, 'no spawn effect for a restored agent');
+    step(os, REST_DELAY_SEC + 30);
+    assert.equal(c.state, CharacterState.REST);
+    assert.equal(tileOf(c), seatTile(os, c.restSeatId!));
+  });
+
+  test('idle agent promoted from overflow starts its rest countdown', () => {
+    const os = fullOffice();
+    os.addAgent(10, 0, 0, undefined, true, undefined, undefined, undefined, false);
+    assert.deepEqual(os.getOverflowAgentIds(), [10]);
+    os.removeAgent(3);
+    step(os, MATRIX_EFFECT_DURATION_SEC + 0.1); // despawn finishes, seat frees, 10 is promoted
+    const c = ch(os, 10);
+    assert.equal(c.isActive, false);
+    assert.equal(c.state, CharacterState.TYPE, 'still at the PC right after promotion');
+    step(os, REST_DELAY_SEC + 30);
+    assert.equal(c.state, CharacterState.REST);
+    assert.equal(tileOf(c), seatTile(os, c.restSeatId!));
+  });
+});
+
 describe('pathfinding', () => {
   test('only the updating character’s two seats are unblocked', () => {
     const os = new OfficeState(userLayout());
