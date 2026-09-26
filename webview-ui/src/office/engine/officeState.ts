@@ -128,7 +128,7 @@ export class OfficeState {
   /**
    * folderName → list of Area labels that workspace folder belongs to.
    * Populated by useExtensionMessages on `areaMappingsLoaded`. Consulted by
-   * `findFreeSeat()` to bias new agents toward seats inside their folder's Area.
+   * `findFreeWorkSeat()` to bias new agents toward seats inside their folder's Area.
    */
   areaMappings: Record<string, string[]> = {};
 
@@ -136,7 +136,7 @@ export class OfficeState {
    * The first-run consent greeter, deliberately NOT in `characters`.
    *
    * `characters` means "agents": everything that iterates it — seat
-   * assignment, palette diversity, the wander FSM, hit-testing, the seat
+   * assignment, palette diversity, the work/rest routine, hit-testing, the seat
    * payload the webview persists — is asking an agent question the greeter has
    * no answer to. Holding it here instead of tagging it with a flag makes
    * every one of those loops correct by default, rather than correct as long

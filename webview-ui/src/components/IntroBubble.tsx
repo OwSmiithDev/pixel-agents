@@ -292,7 +292,7 @@ export function IntroBubble({
         {step === WELCOME_STEP && (
           <p className="text-sm m-0 mb-8">
             In this office, your AI agents become tiny pixel characters: they type at their desks
-            while they work, wander off when they're done, and speak up when they need you.
+            while they work, head to the lounge when they're done, and speak up when they need you.
           </p>
         )}
 

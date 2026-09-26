@@ -572,7 +572,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         // Settings + folder→Area mappings MUST be dispatched BEFORE restoreAgents
         // and the auto-spawn path. Both paths emit `agentCreated` postMessages via
         // AgentStateStore events; the webview's handler routes each agent through
-        // OfficeState.findFreeSeat(folderName), which depends on `areaMappings`.
+        // OfficeState.findFreeWorkSeat({ folderName }), which depends on `areaMappings`.
         // If we restore agents first, Stage-1 (in-Area) is silently skipped for
         // restored / auto-spawned agents and their preferred Area placement is lost.
         const soundEnabled = this.adapter.getSetting<boolean>(GLOBAL_KEY_SOUND_ENABLED, true);
@@ -651,7 +651,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         }
 
         // Folder→Area mappings (must arrive before any agentCreated/existingAgents
-        // so OfficeState.findFreeSeat has the dict when characters are placed).
+        // so OfficeState.findFreeWorkSeat has the dict when characters are placed).
         this.webview?.postMessage({
           type: 'areaMappingsLoaded',
           mappings: config.vscode.areaMappings ?? {},

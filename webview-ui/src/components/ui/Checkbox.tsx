@@ -2,13 +2,16 @@ interface CheckboxProps {
   checked: boolean;
   onChange: () => void;
   label: string;
+  /** Native tooltip. */
+  title?: string;
   className?: string;
 }
 
-export function Checkbox({ checked, onChange, label, className = '' }: CheckboxProps) {
+export function Checkbox({ checked, onChange, label, title, className = '' }: CheckboxProps) {
   return (
     <button
       onClick={onChange}
+      title={title}
       className={`flex items-center justify-between w-full py-6 px-10 bg-transparent border-none rounded-none cursor-pointer text-left hover:bg-btn-bg ${className}`}
     >
       <span>{label}</span>

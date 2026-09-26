@@ -15,7 +15,8 @@ interface SettingsModalProps {
   onToggleDebugMode: () => void;
   alwaysShowOverlay: boolean;
   onToggleAlwaysShowOverlay: () => void;
-  /** Derive an agent's task title from its first prompt when no tag/todo gives one. */
+  /** Task titles from prompts: a `TASK:`-style tag, else the prompt's first words (todo titles work either way).
+   *  Off disables both prompt sources and removes the prompt (UserPromptSubmit) hook; on re-adds it when consent covers it. */
   taskTitleFromPrompt: boolean;
   onToggleTaskTitleFromPrompt: () => void;
   /** Whether headless agents (adopted, no terminal to focus) render translucent. */
@@ -200,7 +201,8 @@ export function SettingsModal({
         onChange={onToggleAlwaysShowOverlay}
       />
       <Checkbox
-        label="Task Title from Prompt"
+        label="Task Titles from Prompts"
+        title="Titles agents from your prompts (a TASK: tag, else the first words). Installs or removes the prompt hook."
         checked={taskTitleFromPrompt}
         onChange={onToggleTaskTitleFromPrompt}
       />
