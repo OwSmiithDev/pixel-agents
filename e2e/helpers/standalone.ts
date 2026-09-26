@@ -240,7 +240,15 @@ export async function launchStandalone(
   const configPath = path.join(tmpHome, '.pixel-agents', 'config.json');
   if ((options.seedHooksConsent ?? true) && !fs.existsSync(configPath)) {
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
-    fs.writeFileSync(configPath, JSON.stringify({ hooksConsent: { claude: 'granted' } }, null, 2));
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        // hooksConsentVersion = server HOOKS_CONSENT_VERSION; unversioned = legacy v1 (re-ask).
+        { hooksConsent: { claude: 'granted' }, hooksConsentVersion: { claude: 2 } },
+        null,
+        2,
+      ),
+    );
   }
   const hostPort = await getFreePort();
   const hostUrl = `http://127.0.0.1:${hostPort}`;

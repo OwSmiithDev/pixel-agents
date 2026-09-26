@@ -120,5 +120,8 @@ export function buildSeedConfig(opts: SeedConfigOptions = {}): Record<string, un
     // Same baseline as the launch-level seed: skip the first-run consent prompt
     // so hook installation proceeds at startup (see e2e/helpers/launch.ts).
     hooksConsent: { claude: 'granted' },
+    // Current consent version (server HOOKS_CONSENT_VERSION); unversioned = legacy v1,
+    // which would show the prompt-hook re-consent ask. See e2e/helpers/launch.ts.
+    hooksConsentVersion: { claude: 2 },
   };
 }

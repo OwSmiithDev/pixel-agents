@@ -116,6 +116,9 @@ export async function launchVSCode(
     vscode: { alwaysShowLabels: true },
     standalone: { alwaysShowLabels: true },
     hooksConsent: { claude: 'granted' },
+    // Current consent version (server HOOKS_CONSENT_VERSION): an unversioned grant
+    // counts as legacy v1 and would show the prompt-hook re-consent ask over the UI.
+    hooksConsentVersion: { claude: 2 },
   };
   fs.writeFileSync(path.join(paDir, 'config.json'), JSON.stringify(seedConfig, null, 2));
   if (opts.seedLayout !== undefined) {
