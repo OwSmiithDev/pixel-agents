@@ -1,8 +1,9 @@
 <h1 align="center">Pixel Agents · Smiith Edition</h1>
 
 <p align="center">
-  Escritório pixel art onde seus agentes Claude Code trabalham — agora com visão 3D iluminada
-  e o layout <strong>Smiith Tech</strong> (40×30, grafite e ciano).
+  Escritório pixel art onde seus agentes Claude Code trabalham — com visão 3D iluminada,
+  o layout <strong>Smiith Tech</strong> (40×30, grafite e ciano) e agentes que trabalham no PC
+  e descansam no lounge, com o título da tarefa sobre a cabeça.
 </p>
 
 <p align="center">
@@ -31,6 +32,53 @@ O 3D fica desabilitado enquanto o editor de layout ou o tour inicial estão aber
   <img src="docs/superpowers/specs/img/office-2d.png" alt="Mesmo escritório na visão 2D original" width="440">
   <img src="docs/superpowers/specs/img/office-3d-select.png" alt="Agente selecionado na visão 3D com painel de status" width="440">
 </p>
+
+## Rotina dos agentes
+
+Cada agente tem **um PC (lugar de trabalho)** e **um lugar de descanso**, e ninguém divide cadeira.
+
+|                           |                                                                                                                                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Trabalhando**           | Com tarefa ativa, o agente vai até o seu PC e digita/lê conforme a ferramenta real em uso.                                                                                                       |
+| **Descansando**           | Sem tarefa (ou 2 s depois do fim do turno), caminha até o lounge e fica sentado, sem digitar e sem passear. Ao receber trabalho, volta caminhando ao PC — sem teleporte.                         |
+| **Aguardando permissão**  | Continua no PC, com o balão `…`.                                                                                                                                                                 |
+| **Subagentes**            | Também ganham um PC próprio (o mais perto do agente pai).                                                                                                                                        |
+| **IDE e Agente NN**       | A primeira sessão aberta é o **IDE** (usa as mesas da área `IDE`, se o layout tiver). As demais são **Agente 01, 02…**                                                                           |
+| **+N fora do escritório** | Mais agentes que PCs livres? Os excedentes aparecem num selo no rodapé (clique para ver a lista) e entram assim que um PC vaga. Não há limite fixo: layouts com mais PCs comportam mais agentes. |
+
+**Como o layout é lido:** cadeira virada para um PC = posto de trabalho; qualquer outra cadeira (sofás, reunião,
+lounge) = descanso. Áreas chamadas `Descanso`/`Lounge`/`Rest` têm preferência para descanso. Layouts sem nenhum PC
+tratam todas as cadeiras como postos de trabalho.
+
+**Legenda sobre a cabeça:** compacta, em uma linha — `Agente 03 · Implementar login` (títulos longos são cortados).
+Avisos urgentes (`Needs approval`, `Waiting for input`) têm prioridade sobre o título. Passe o mouse ou clique no
+agente para ver a versão completa: título, atividade atual e uso de contexto.
+
+### Título da tarefa
+
+O título mostrado na legenda vem, nesta ordem:
+
+1. **Linha de tarefa no prompt** — `TASK:`, `TAREFA:`, `TÍTULO:`, `TITLE:` ou `OBJECTIVE:`. Ideal para orquestradores
+   (ex.: Herdr + Claude): inclua `TASK: Implementar login` no handoff enviado ao agente.
+2. **Tarefa em andamento** na lista de tarefas do próprio Claude (TodoWrite/TaskCreate).
+3. **Primeiras palavras** do pedido (até 8 palavras / 60 caracteres).
+
+Sem nenhuma fonte, a legenda mostra `Sem tarefa informada`.
+
+**Privacidade:** para as opções 1 e 3, a extensão instala o hook `UserPromptSubmit` do Claude Code — só depois de você
+aceitar o aviso "task titles from your prompts". O prompt é reduzido a um título de no máximo 60 caracteres assim que
+chega ao servidor local e **nunca é gravado, registrado em log nem repassado**. Para desligar: **Settings → Task Titles
+from Prompts** (o hook é removido).
+
+<p align="center">
+  <img src="docs/superpowers/specs/img/routines-3d.png" alt="Agentes trabalhando nos PCs e descansando no lounge, visão 3D" width="440">
+  <img src="docs/superpowers/specs/img/routines-overflow.png" alt="Selo +2 fora do escritório com a lista dos agentes excedentes" width="440">
+</p>
+
+## Template de 10 agentes
+
+`layouts/smiith-10-agentes.json` (32×24): 1 mesa de IDE, 9 mesas de agentes e um lounge com 12 lugares de descanso.
+Importe em **Settings → Import Layout**. Gerado por `scripts/layouts/ten-agents.mjs`.
 
 ## Como rodar
 
@@ -68,39 +116,52 @@ Depois de instalar, feche e reabra o VS Code e aceite a instalação dos hooks n
 
 ## Onde está cada coisa
 
-| Caminho                                          | O quê                                                                 |
-| ------------------------------------------------ | --------------------------------------------------------------------- |
-| `webview-ui/src/office/three/`                   | Renderer 3D: câmera, chão, sprites, luzes, efeitos                    |
-| `webview-ui/src/office/three/coords.ts`          | Mapeamento sprite 2D → mundo 3D (mantém a mesma oclusão do 2D)        |
-| `webview-ui/src/office/engine/officeClick.ts`    | Lógica de clique compartilhada entre 2D e 3D                          |
-| `webview-ui/src/constants.ts`                    | Cores e parâmetros do 3D (`THREE_*`) — ângulo de câmera, luzes, bloom |
-| `scripts/layouts/smiith-tech.mjs`                | Gerador do layout Smiith Tech (salas como retângulos)                 |
-| `webview-ui/public/assets/default-layout-2.json` | Layout gerado, usado como padrão                                      |
-| `layouts/smiith-10-agentes.json`                 | Template de 10 agentes (Settings → Import Layout)                     |
-| `docs/superpowers/specs/`                        | Design e decisões técnicas                                            |
+| Caminho                                            | O quê                                                                 |
+| -------------------------------------------------- | --------------------------------------------------------------------- |
+| `webview-ui/src/office/three/`                     | Renderer 3D: câmera, chão, sprites, luzes, efeitos                    |
+| `webview-ui/src/office/three/coords.ts`            | Mapeamento sprite 2D → mundo 3D (mantém a mesma oclusão do 2D)        |
+| `webview-ui/src/office/engine/officeClick.ts`      | Lógica de clique compartilhada entre 2D e 3D                          |
+| `webview-ui/src/office/engine/officeState.ts`      | Assentos de trabalho/descanso, fila "fora do escritório", IDE/rótulos |
+| `webview-ui/src/office/engine/characters.ts`       | Máquina de estados dos personagens (trabalho, caminhada, descanso)    |
+| `webview-ui/src/office/components/ToolOverlay.tsx` | Legenda compacta/expandida sobre os agentes                           |
+| `server/src/taskTitle.ts`                          | Derivação do título da tarefa (tag › lista de tarefas › prompt)       |
+| `webview-ui/src/constants.ts`                      | Cores e parâmetros do 3D (`THREE_*`) — ângulo de câmera, luzes, bloom |
+| `scripts/layouts/smiith-tech.mjs`                  | Gerador do layout Smiith Tech (salas como retângulos)                 |
+| `webview-ui/public/assets/default-layout-2.json`   | Layout gerado, usado como padrão                                      |
+| `layouts/smiith-10-agentes.json`                   | Template de 10 agentes (Settings → Import Layout)                     |
+| `docs/superpowers/specs/`                          | Design e decisões técnicas                                            |
 
 Para ajustar o layout, edite o gerador e rode `node scripts/layouts/smiith-tech.mjs`.
 
 ## Testes
 
 ```bash
-cd webview-ui && npx vitest run   # interface, layout e coordenadas 3D
+cd webview-ui && npx vitest run   # interface, rotinas, rótulos, layout e coordenadas 3D
+npm run test:server               # servidor (títulos, consentimento, hooks)
 npm run build                     # tipos, lint e bundle
+npm run e2e                       # ponta a ponta: abre um VS Code de teste real
 ```
+
+Os testes do servidor rodam com uma pasta pessoal temporária e **falham se tocarem** no seu `~/.pixel-agents` ou
+`~/.claude/settings.json` reais.
+
+Os testes e2e podem ser iniciados de dentro de um terminal do VS Code: o lançador remove as variáveis herdadas do
+VS Code pai (`ELECTRON_RUN_AS_NODE`, `VSCODE_*`), que antes impediam o VS Code de teste de abrir.
 
 ## Créditos
 
 Este projeto é um fork de **[Pixel Agents](https://github.com/pixel-agents-hq/pixel-agents)**, criado e mantido por
 **[Pablo De Lucca](https://github.com/pablodelucca)** e contribuidores. Toda a base — extensão VS Code, servidor
 standalone, detecção de agentes por hooks, motor de personagens, editor de layout e arte pixel — é trabalho deles.
-Este fork adiciona a visão 3D e o layout Smiith Tech por cima.
+Este fork adiciona por cima a visão 3D, o layout Smiith Tech, a rotina de trabalho/descanso dos agentes, os títulos
+de tarefa e o template de 10 agentes.
 
 - README original do projeto: [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md)
 - Apoie o autor original: [GitHub Sponsors](https://github.com/sponsors/pablodelucca) · [Ko-fi](https://ko-fi.com/pablodelucca)
 - Comunidade original: [Discord](https://discord.gg/Yk7jXebv9H) · [Discussions](https://github.com/pixel-agents-hq/pixel-agents/discussions)
 
 Bugs do núcleo do Pixel Agents devem ser reportados no [repositório original](https://github.com/pixel-agents-hq/pixel-agents/issues);
-problemas da visão 3D ou do layout Smiith Tech, [aqui](https://github.com/OwSmiithDev/pixel-agents/issues).
+problemas da visão 3D, das rotinas, dos títulos ou dos layouts Smiith, [aqui](https://github.com/OwSmiithDev/pixel-agents/issues).
 
 ## Licença
 
