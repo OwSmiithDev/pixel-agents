@@ -249,6 +249,7 @@ export function useExtensionMessages(
             p.folderName,
             undefined,
             p.restSeatId,
+            false, // restored: idle until a real activity signal arrives
           );
           if (p.isHeadless) os.setHeadless(p.id, true);
         }
@@ -288,6 +289,8 @@ export function useExtensionMessages(
             undefined,
             parentCh?.folderName,
             teammateParentId,
+            undefined,
+            false, // idle until a real activity signal arrives
           );
           noteFolderName(parentCh?.folderName);
           // Set team metadata on the character
@@ -310,7 +313,17 @@ export function useExtensionMessages(
         } else {
           const palette = msg.palette as number | undefined;
           const hueShift = msg.hueShift as number | undefined;
-          os.addAgent(id, palette, hueShift, undefined, undefined, folderName);
+          os.addAgent(
+            id,
+            palette,
+            hueShift,
+            undefined,
+            undefined,
+            folderName,
+            undefined,
+            undefined,
+            false, // idle until a real activity signal arrives
+          );
           noteFolderName(folderName);
           if (isHeadlessAgent(msg.isExternal as boolean | undefined)) {
             os.setHeadless(id, true);

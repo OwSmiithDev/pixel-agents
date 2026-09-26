@@ -34,6 +34,7 @@ interface AddAgentCall {
   seatId?: string;
   skipSpawnEffect?: boolean;
   folderName?: string;
+  isActive?: boolean;
 }
 
 /** A fake office that records addAgent calls, mirroring how officeCanvasCursor
@@ -48,9 +49,19 @@ function fakeOffice(
     calls,
     headless,
     characters: { has: (id: number) => ids.has(id) },
-    addAgent: (id, palette, hueShift, seatId, skipSpawnEffect, folderName) => {
+    addAgent: (
+      id,
+      palette,
+      hueShift,
+      seatId,
+      skipSpawnEffect,
+      folderName,
+      _near,
+      _rest,
+      isActive,
+    ) => {
       ids.add(id);
-      calls.push({ id, palette, hueShift, seatId, skipSpawnEffect, folderName });
+      calls.push({ id, palette, hueShift, seatId, skipSpawnEffect, folderName, isActive });
     },
     setHeadless: (id, isHeadless) => {
       if (isHeadless) headless.push(id);
@@ -81,6 +92,7 @@ test('layout ready: adds restored agents immediately with their seat metadata', 
       seatId: 'seat-a',
       skipSpawnEffect: true,
       folderName: 'alpha',
+      isActive: false, // restored agents start idle until a real activity signal
     },
   ]);
 });
@@ -182,6 +194,7 @@ test('layout ready: agent with no metadata is still added with undefined fields'
       seatId: undefined,
       skipSpawnEffect: true,
       folderName: undefined,
+      isActive: false,
     },
   ]);
 });

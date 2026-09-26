@@ -18,7 +18,7 @@ import {
   REST_DELAY_SEC,
   WALK_SPEED_PX_PER_SEC,
 } from '../src/constants.js';
-import type { ExistingAgentsOffice } from '../src/office/engine/existingAgents.js';
+import type { ExistingAgentsOffice, PendingAgent } from '../src/office/engine/existingAgents.js';
 import { reconcileExistingAgents } from '../src/office/engine/existingAgents.js';
 import { OfficeState } from '../src/office/engine/officeState.js';
 import type { Character, OfficeLayout } from '../src/office/types.js';
@@ -499,6 +499,19 @@ describe('restore', () => {
     );
     assert.equal(calls[0][3], 'work-agent-03');
     assert.equal(calls[0][7], 'rest-armchair');
+    assert.equal(calls[0][8], false, 'restored agents start idle until a real activity signal');
+  });
+
+  test('existingAgents restore (real office) ends up resting, not stuck at the PC', () => {
+    const os = new OfficeState(userLayout());
+    const pending: PendingAgent[] = [];
+    reconcileExistingAgents(os, [1], { 1: { seatId: 'work-agent-05' } }, {}, true, pending);
+    const c = ch(os, 1);
+    assert.equal(c.isActive, false, 'restored agent starts idle');
+    assert.equal(c.state, CharacterState.TYPE, 'seated at the PC right after restore');
+    step(os, REST_DELAY_SEC + 30);
+    assert.equal(c.state, CharacterState.REST);
+    assert.equal(tileOf(c), seatTile(os, c.restSeatId!));
   });
 });
 

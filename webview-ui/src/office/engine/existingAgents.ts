@@ -42,6 +42,7 @@ export interface ExistingAgentsOffice {
     folderName?: string,
     nearAgentId?: number,
     preferredRestSeatId?: string,
+    isActive?: boolean,
   ) => void;
   setHeadless: (id: number, headless: boolean) => void;
 }
@@ -85,6 +86,7 @@ export function reconcileExistingAgents(
           p.folderName,
           undefined,
           p.restSeatId,
+          false, // restored: idle until a real activity signal arrives
         );
         if (p.isHeadless) os.setHeadless(p.id, true);
         addedDirectly = true;
