@@ -273,27 +273,11 @@ export function installTestHooks(officeStateRef: { current: OfficeState | null }
   };
 
   const origAddAgent = OfficeState.prototype.addAgent;
-  OfficeState.prototype.addAgent = function (
-    id,
-    preferredPalette,
-    preferredHueShift,
-    preferredSeatId,
-    skipSpawnEffect,
-    folderName,
-    nearAgentId,
-    preferredRestSeatId,
-  ) {
-    origAddAgent.call(
-      this,
-      id,
-      preferredPalette,
-      preferredHueShift,
-      preferredSeatId,
-      skipSpawnEffect,
-      folderName,
-      nearAgentId,
-      preferredRestSeatId,
-    );
+  // Forward every argument: listing them one by one silently dropped each new
+  // trailing parameter (preferredRestSeatId, then isActive) under e2e only.
+  OfficeState.prototype.addAgent = function (...args: Parameters<OfficeState['addAgent']>) {
+    origAddAgent.apply(this, args);
+    const [id, , , , skipSpawnEffect] = args;
     const ch = this.characters.get(id);
     hooks.addAgentLog?.push({
       id,
