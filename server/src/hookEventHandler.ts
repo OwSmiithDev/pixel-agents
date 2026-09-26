@@ -465,17 +465,17 @@ export class HookEventHandler {
     agent.currentHookIsTeammateSpawn =
       this.provider.team?.isTeammateSpawnCall(toolName, toolInput) ?? false;
 
-    // Todo titles first: a team lead's TodoWrite/TaskUpdate must still title it
-    // (the inline-teammate return below only suppresses tool DISPLAY).
+    // When a lead has inline teammates, hook tool events are ambiguous (could be
+    // from the lead or any teammate -- they share session_id). Suppress hook-originated
+    // tool display on the lead. Both lead and teammate tools display via JSONL polling.
+    // Todo titles are suppressed too: teammates claim shared-task-list items with
+    // TaskUpdate in_progress, which would otherwise retitle the lead.
+    if (hasInlineTeammates(agentId, this.agents)) return;
+
     if (normEvent.todo) {
       applyTodoSignal((agent.taskTitle ??= createTaskTitleState()), normEvent.todo);
       this.broadcastTaskTitle(agent, agentId);
     }
-
-    // When a lead has inline teammates, hook tool events are ambiguous (could be
-    // from the lead or any teammate -- they share session_id). Suppress hook-originated
-    // tool display on the lead. Both lead and teammate tools display via JSONL polling.
-    if (hasInlineTeammates(agentId, this.agents)) return;
 
     // Cancel waiting, mark active
     cancelWaitingTimer(agentId, this.waitingTimers);

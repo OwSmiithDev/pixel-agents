@@ -314,12 +314,11 @@ describe('agentTask via HookEventHandler', () => {
     });
   });
 
-  it('a lead with inline teammates still gets todo titles (tool display stays suppressed)', () => {
+  it('a lead with inline teammates gets no todo titles from the shared session (teammates would retitle it)', () => {
     agents.set(2, createTestAgent({ id: 2, sessionId: 'sess-1', leadAgentId: 1 }));
+    tool('TaskUpdate', { taskId: '1', status: 'in_progress', subject: 'Teammate claimed task' });
     tool('TodoWrite', { todos: [{ content: 'Coordinate team', status: 'in_progress' }] });
-    expect(tasks()).toEqual([
-      { type: 'agentTask', id: 1, title: 'Coordinate team', source: 'todo' },
-    ]);
+    expect(tasks()).toEqual([]);
     expect(messages.some((m) => m.type === 'agentToolStart' && m.id === 1)).toBe(false);
   });
 
