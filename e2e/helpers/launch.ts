@@ -55,6 +55,22 @@ export interface LaunchOptions {
 }
 
 /**
+ * Drop env vars inherited from a parent VS Code process (e.g. when the suite is
+ * started from an integrated terminal or an agent running in the extension
+ * host). ELECTRON_RUN_AS_NODE=1 makes Code.exe run as plain Node, so Playwright
+ * reports "Process failed to launch!"; VSCODE_* IPC vars point the test
+ * instance at the parent window.
+ */
+export function withoutParentVSCodeEnv(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(base)) {
+    if (key === 'ELECTRON_RUN_AS_NODE' || key.startsWith('VSCODE_')) continue;
+    env[key] = value;
+  }
+  return env;
+}
+
+/**
  * Launch VS Code with the Pixel Agents extension loaded in development mode.
  *
  * Uses an isolated temp HOME and injects the mock `claude` binary at the
@@ -330,7 +346,7 @@ export async function launchVSCode(
   fs.mkdirSync(path.dirname(debugLogFile), { recursive: true });
 
   const env: Record<string, string> = {
-    ...(applyMockHomeEnv(process.env, tmpHome) as Record<string, string>),
+    ...(applyMockHomeEnv(withoutParentVSCodeEnv(process.env), tmpHome) as Record<string, string>),
     // Prepend mock bin so 'claude' resolves to our mock
     PATH: `${mockBinDir}${PATH_SEP}${process.env['PATH'] ?? '/usr/local/bin:/usr/bin:/bin'}`,
     PIXEL_AGENTS_E2E_CLAUDE_BIN: mockClaudeBinaryPath,
