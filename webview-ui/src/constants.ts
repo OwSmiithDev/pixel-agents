@@ -365,6 +365,30 @@ export const THREE_ALPHA_TEST = 0.5;
 export const THREE_BUBBLE_RENDER_ORDER = 10;
 /** localStorage key for the persisted 2D/3D choice. */
 export const VIEW_MODE_STORAGE_KEY = 'pixel-agents.viewMode';
+
+// ── Órbita (free orbit camera over 3D blocks + voxels) ─────────────────
+export const ORBIT_PROJECTION_STORAGE_KEY = 'pixel-agents.orbitProjection';
+export const ORBIT_CAMERA_STORAGE_KEY = 'pixel-agents.orbitCamera';
+export const ORBIT_DEFAULT_YAW_DEG = 35;
+/** Elevation above the floor, like THREE_CAMERA_PITCH_DEG. */
+export const ORBIT_DEFAULT_PITCH_DEG = 52;
+export const ORBIT_PITCH_MIN_DEG = 20;
+export const ORBIT_PITCH_MAX_DEG = 78;
+export const ORBIT_PERSP_FOV_DEG = 38;
+/** Wall block height in tiles. */
+export const ORBIT_WALL_HEIGHT = 1.5;
+export const ORBIT_WALL_CUT_HEIGHT = 0.15;
+/** Walls farther than this (tiles) from the camera target are never cut. */
+export const ORBIT_WALL_CUT_RADIUS = 14;
+export const ORBIT_WALL_CUT_HALF_ANGLE_DEG = 70;
+export const ORBIT_WALL_DEFAULT_COLOR = '#3A4452';
+/** Pointer travel (CSS px) above which a press is a drag, not a click. */
+export const ORBIT_CLICK_SLOP_PX = 4;
+/** Voxel extrusion depth in sprite px, by role. */
+export const ORBIT_VOXEL_DEPTH_PX = { electronics: 3, wall: 2, misc: 6 } as const;
+/** How far (tiles) a chair card sits behind its seated character. */
+export const ORBIT_CHAIR_BACK_OFFSET = 0.15;
+
 export const THREE_MONITOR_LIGHT_INTENSITY = 2.2;
 export const THREE_MONITOR_LIGHT_DISTANCE = 3.5;
 export const THREE_MONITOR_LIGHT_HEIGHT = 1.2;
