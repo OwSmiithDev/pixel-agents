@@ -16,6 +16,7 @@ import { KeyLight } from '../KeyLight.js';
 import { MonitorLights } from '../MonitorLights.js';
 import type { ScreenProjector } from '../Office3D.js';
 import { usePrefersReducedMotion } from '../usePrefersReducedMotion.js';
+import { OrbitActors } from './OrbitActors.js';
 import { OrbitRig, type OrbitViewState } from './OrbitRig.js';
 
 interface OrbitSceneProps {
@@ -72,6 +73,7 @@ export function OrbitScene({
         <KeyLight officeState={officeState} />
         <MonitorLights officeState={officeState} />
         <FloorLayer officeState={officeState} reducedMotion={reducedMotion} />
+        <OrbitActors officeState={officeState} viewRef={viewRef} pickablesRef={pickablesRef} />
         <Effects />
       </Canvas>
     </div>
