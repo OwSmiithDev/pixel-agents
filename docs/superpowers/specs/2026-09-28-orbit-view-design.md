@@ -74,7 +74,7 @@ Arte top-down "3/4": as linhas de cima do sprite mostram o tampo, as de baixo mo
 
 ## Corte de paredes
 
-Para cada tile de parede, a normal de saída é a direção dos vizinhos que não são parede de interior. Implementação simples e suficiente: a parede é cortada quando está do lado da câmera em relação ao alvo e o ângulo entre `parede → alvo` e `câmera → alvo` no plano XZ é menor que 70°, a até 12 tiles do alvo. Função pura `shouldCutWall(wall, target, camera)`. A altura anima até 0,15 tile (sem transparência, para evitar problema de ordem de alpha).
+Para cada tile de parede, a normal de saída é a direção dos vizinhos que não são parede de interior. Implementação simples e suficiente: a parede é cortada quando está do lado da câmera em relação ao alvo e o ângulo entre `parede → alvo` e `câmera → alvo` no plano XZ é menor que 70°, a até 14 tiles do alvo. Função pura `shouldCutWall(wall, target, camera)`. A altura anima até 0,15 tile (sem transparência, para evitar problema de ordem de alpha).
 
 ## Arquitetura
 
