@@ -70,6 +70,12 @@ export interface FurnitureInstance {
   zY: number;
   /** Render-time horizontal flip flag (for mirrored side variants) */
   mirrored?: boolean;
+  /** Layout identity + catalog type (after auto-state), for renderers that rebuild per item (orbit view). */
+  uid?: string;
+  type?: string;
+  col?: number;
+  row?: number;
+  color?: ColorValue;
 }
 
 export interface ToolActivity {

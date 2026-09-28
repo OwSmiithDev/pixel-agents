@@ -5,10 +5,24 @@ import type {
   OfficeLayout,
   PlacedFurniture,
   Seat,
+  SpriteData,
   TileType as TileTypeVal,
 } from '../types.js';
 import { DEFAULT_COLS, DEFAULT_ROWS, Direction, TILE_SIZE, TileType } from '../types.js';
 import { getCatalogEntry, getOrientationInGroup } from './furnitureCatalog.js';
+
+/** Catalog sprite for a furniture type, colorized like the 2D renderer when `color` is set. */
+export function furnitureSprite(type: string, color?: ColorValue): SpriteData | null {
+  const entry = getCatalogEntry(type);
+  if (!entry) return null;
+  if (!color) return entry.sprite;
+  const { h, s, b: bv, c: cv } = color;
+  return getColorizedSprite(
+    `furn-${type}-${h}-${s}-${bv}-${cv}-${color.colorize ? 1 : 0}`,
+    entry.sprite,
+    color,
+  );
+}
 
 /** Convert flat tile array from layout into 2D grid */
 export function layoutToTileMap(layout: OfficeLayout): TileTypeVal[][] {
@@ -74,16 +88,7 @@ export function layoutToFurnitureInstances(furniture: PlacedFurniture[]): Furnit
       }
     }
 
-    // Colorize sprite if this furniture has a color override
-    let sprite = entry.sprite;
-    if (item.color) {
-      const { h, s, b: bv, c: cv } = item.color;
-      sprite = getColorizedSprite(
-        `furn-${item.type}-${h}-${s}-${bv}-${cv}-${item.color.colorize ? 1 : 0}`,
-        entry.sprite,
-        item.color,
-      );
-    }
+    const sprite = furnitureSprite(item.type, item.color) ?? entry.sprite;
 
     // Determine if this instance should be mirrored (side asset used in "left" orientation)
     let mirrored = false;
@@ -94,7 +99,18 @@ export function layoutToFurnitureInstances(furniture: PlacedFurniture[]): Furnit
       }
     }
 
-    instances.push({ sprite, x, y, zY, ...(mirrored ? { mirrored: true } : {}) });
+    instances.push({
+      sprite,
+      x,
+      y,
+      zY,
+      ...(mirrored ? { mirrored: true } : {}),
+      uid: item.uid,
+      type: item.type,
+      col: item.col,
+      row: item.row,
+      ...(item.color ? { color: item.color } : {}),
+    });
   }
   return instances;
 }

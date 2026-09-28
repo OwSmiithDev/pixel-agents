@@ -11,12 +11,16 @@
 
 import assert from 'node:assert/strict';
 
-import { test } from 'vitest';
+import { beforeAll, describe, expect, it, test } from 'vitest';
 
 import type { ColorValue } from '../src/components/ui/types.js';
-import { migrateLayoutColors } from '../src/office/layout/layoutSerializer.js';
+import {
+  layoutToFurnitureInstances,
+  migrateLayoutColors,
+} from '../src/office/layout/layoutSerializer.js';
 import type { OfficeLayout, PlacedFurniture, PlacedPet } from '../src/office/types.js';
 import { TileType } from '../src/office/types.js';
+import { loadCatalog } from './fixtures/office.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -146,4 +150,20 @@ test('migrateLayoutColors is idempotent (running twice produces equivalent outpu
   assert.deepEqual(twice.pets, once.pets);
   assert.deepEqual(twice.tiles, once.tiles);
   assert.deepEqual(twice.tileColors, once.tileColors);
+});
+
+// ── layoutToFurnitureInstances: orbit-view tagging ────────────
+
+describe('layoutToFurnitureInstances (orbit tagging)', () => {
+  beforeAll(() => {
+    loadCatalog();
+  });
+
+  it('tags each instance with uid, type, tile and color for the orbit view', () => {
+    const color: ColorValue = { h: 200, s: 40, b: 0, c: 0 };
+    const [inst] = layoutToFurnitureInstances([
+      { uid: 'u1', type: 'DESK_FRONT', col: 2, row: 3, color },
+    ]);
+    expect(inst).toMatchObject({ uid: 'u1', type: 'DESK_FRONT', col: 2, row: 3, color });
+  });
 });
