@@ -55,7 +55,7 @@ Arte top-down "3/4": as linhas de cima do sprite mostram o tampo, as de baixo mo
 ### Voxel
 
 - Um cubo `1/16` por pixel opaco (alpha ≥ 128) do retângulo opaco, em `InstancedMesh` com cor por instância.
-- Profundidade padrão por categoria: `electronics` 3 px, parede 2 px (quadros 1 px), `misc` 6 px.
+- Profundidade padrão por categoria: `electronics` 3 px, itens de parede 2 px, `misc` 6 px.
 - Pixels claros (luminância > 0,55) ficam 1 px recuados quando a profundidade é > 2 (tela afundada, lombada de livro).
 - Monitores ligados: o sprite muda a cada quadro de animação (auto-state do motor). Mesmas posições, só as cores são atualizadas (`instanceColor`), sem recriar a malha. Se a máscara opaca mudar (ex.: OFF → ON), a malha é recriada.
 - Itens `electronics` sobre mesa: as linhas que representam a parte deitada (teclado) viram voxels deitados sobre o tampo; o resto fica em pé. Divisão: primeira linha totalmente transparente abaixo do bloco superior; sem linha vazia, tudo fica em pé.
@@ -63,8 +63,8 @@ Arte top-down "3/4": as linhas de cima do sprite mostram o tampo, as de baixo mo
 ## Câmera e controles
 
 - `CameraControls` do `@react-three/drei` (já instalado; nenhuma dependência nova).
-- Arrastar com botão esquerdo gira; botão direito ou do meio move; roda aproxima; Ctrl+roda mantém o passo de zoom do 2D.
-- Pitch limitado entre 20° e 78°. Alvo preso ao retângulo do layout. Zoom limitado.
+- Arrastar com botão esquerdo gira; botão direito ou do meio move; roda aproxima (zoom na Miniatura, distância no Jogo). Os botões +/− do app também mudam a escala da câmera.
+- Pitch limitado entre 20° e 78°. Alvo preso ao retângulo do layout (`CameraControls.setBoundary`). Zoom limitado.
 - Q/E giram 90° com animação; R volta ao ângulo inicial (pitch 52°, yaw 35°).
 - Clique só conta como clique se o ponteiro mexeu menos de 4 px entre apertar e soltar (senão foi giro).
 - Seguir agente (`cameraFollowId`) e alvo do tour (`greeterCameraTarget`) movem o alvo com a mesma suavização de hoje. Arrastar cancela o seguir.
@@ -82,7 +82,7 @@ Novos arquivos em `webview-ui/src/office/three/orbit/`:
 
 | Arquivo              | Responsabilidade                                                                                               |
 | -------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `orbitMath.ts`       | Funções puras: `relativeDirection`, `snapYaw`, `clampTarget`, `shouldCutWall`.                                 |
+| `orbitMath.ts`       | Funções puras: `relativeDirection`, `snapYaw`, `shouldCutWall`, `perspDistance`.                               |
 | `orbitKind.ts`       | Função pura `orbitKind(entry, footprint)` → `'voxel' \| 'box' \| 'dirCard' \| 'yCard'`, com overrides.         |
 | `voxelize.ts`        | Função pura `voxelize(sprite, opts)` → lista de células (posição, cor, profundidade, deitado/em pé).           |
 | `boxFaces.ts`        | Função pura `boxFaces(sprite, footprint)` → faixas de linhas do tampo/frente, altura, coluna lateral.          |
@@ -121,6 +121,6 @@ O motor continua o único dono do estado: a Órbita só lê `officeState` a cada
 
 ## Testes
 
-- Vitest (node) para as funções puras: `relativeDirection` (0°, 90°, 180°, 270°), `snapYaw`, `clampTarget`, `shouldCutWall` (parede entre câmera e alvo, atrás, ao lado), `orbitKind` (cada categoria, override, desconhecida), `voxelize` (contagem de células, recuo de pixel claro, divisão em pé/deitado do PC real), `boxFaces` (mesa real `DESK_FRONT`, sofá, mesa de centro), `viewMode` (ler/gravar `'orbit'` e projeção, valor inválido volta ao padrão).
+- Vitest (node) para as funções puras: `relativeDirection` (0°, 90°, 180°, 270°), `snapYaw`, `perspDistance`, `shouldCutWall` (parede entre câmera e alvo, atrás, ao lado), `orbitKind` (cada categoria, override, desconhecida), `voxelize` (contagem de células, recuo de pixel claro, divisão em pé/deitado do PC real), `boxFaces` (mesa real `DESK_FRONT`, sofá, mesa de centro), `viewMode` (ler/gravar `'orbit'` e projeção, valor inválido volta ao padrão).
 - Checagem visual com Playwright no modo navegador (`npm run dev` + mensagens simuladas, como o script usado nas rotinas): Smiith Tech e template de 10 agentes, em Miniatura e Jogo, nos yaws 0°, 90°, 180°, 270°; clique em agente abre o painel; legenda acompanha; paredes da frente cortadas.
 - `npm run build` (tipos, lint, bundle) e suíte vitest completa sem regressão. E2E existente continua rodando (a Órbita não muda o fluxo padrão, que abre em 2D).
