@@ -122,6 +122,12 @@ export function OrbitActors({ officeState, viewRef, pickablesRef }: Props) {
       // `lift + sprite.length / TILE_SIZE` (bottom-anchored quad), so this
       // formula floats the bubble ~0.5 tile above the head — tuned visually
       // in Step 2 against the isometric SpriteLayer look.
+      // Deliberately reuses the character's own `lift` (world units) rather than
+      // SpriteLayer's BUBBLE_SITTING_OFFSET_PX (a 2D screen-space nudge tuned for
+      // isometric foreshortening): `lift` cancels out of the head-to-bubble gap
+      // exactly, so seated and standing agents keep the same ~0.5-tile clearance
+      // in this 3D view — measured via a debug world-position log (seated+bubble:
+      // gapAboveHead = 0.5, same as standing).
       const bubbleY = lift + BUBBLE_VERTICAL_OFFSET_PX / TILE_SIZE + sprite.length / TILE_SIZE / 2;
       place(bubble, x, z, bubbleY, {
         alpha: bubbleAlpha,
