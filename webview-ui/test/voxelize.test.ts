@@ -62,14 +62,22 @@ describe('voxelize', () => {
     expect(m.standEndPx).toBe(23);
   });
   it('strips alpha from colors', () => {
+    // Hex placeholders are test fixtures, not UI tokens — disable the
+    // centralized-color rule just for this pixel-color literal.
+    /* eslint-disable pixel-agents/no-inline-colors */
     const m = voxelize([['#11223380']], { depthPx: 1, splitLying: false });
     expect(m.cells[0].color).toBe('#112233');
+    /* eslint-enable pixel-agents/no-inline-colors */
   });
 });
 
 describe('maskKey', () => {
   it('ignores colors but not shape', () => {
+    // Hex placeholders are test fixtures, not UI tokens — disable the
+    // centralized-color rule just for these mask literals.
+    /* eslint-disable pixel-agents/no-inline-colors */
     expect(maskKey([['#000', '']])).toBe(maskKey([['#FFF', '']]));
     expect(maskKey([['#000', '']])).not.toBe(maskKey([['', '#000']]));
+    /* eslint-enable pixel-agents/no-inline-colors */
   });
 });
