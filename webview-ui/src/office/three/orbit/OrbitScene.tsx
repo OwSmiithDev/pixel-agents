@@ -18,6 +18,7 @@ import type { ScreenProjector } from '../Office3D.js';
 import { usePrefersReducedMotion } from '../usePrefersReducedMotion.js';
 import { OrbitActors } from './OrbitActors.js';
 import { OrbitRig, type OrbitViewState } from './OrbitRig.js';
+import { OrbitWalls } from './OrbitWalls.js';
 
 interface OrbitSceneProps {
   officeState: OfficeState;
@@ -37,6 +38,7 @@ export function OrbitScene({
   const reducedMotion = usePrefersReducedMotion();
   const viewRef = useRef<OrbitViewState>({ yaw: 0, target: new THREE.Vector3() });
   const pickablesRef = useRef<THREE.Object3D[]>([]);
+  const cutRef = useRef(new Set<string>());
   const ortho = projection === 'ortho';
   return (
     <div
@@ -73,6 +75,12 @@ export function OrbitScene({
         <KeyLight officeState={officeState} />
         <MonitorLights officeState={officeState} />
         <FloorLayer officeState={officeState} reducedMotion={reducedMotion} />
+        <OrbitWalls
+          officeState={officeState}
+          viewRef={viewRef}
+          cutRef={cutRef}
+          reducedMotion={reducedMotion}
+        />
         <OrbitActors officeState={officeState} viewRef={viewRef} pickablesRef={pickablesRef} />
         <Effects />
       </Canvas>
