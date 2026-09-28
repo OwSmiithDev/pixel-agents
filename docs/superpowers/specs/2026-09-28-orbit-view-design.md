@@ -1,7 +1,7 @@
 # Órbita 3D (diorama + voxel) — Design
 
 **Data:** 2026-09-28
-**Status:** aprovado na conversa (opção B + C, demonstração "Diorama Smiith")
+**Status:** implementado na branch `feat/orbit-view` (opção B + C, demonstração "Diorama Smiith"); plano em `docs/superpowers/plans/2026-09-28-orbit-view.md`
 **Branch:** `feat/orbit-view`
 
 ## Objetivo
@@ -124,3 +124,16 @@ O motor continua o único dono do estado: a Órbita só lê `officeState` a cada
 - Vitest (node) para as funções puras: `relativeDirection` (0°, 90°, 180°, 270°), `snapYaw`, `perspDistance`, `shouldCutWall` (parede entre câmera e alvo, atrás, ao lado), `orbitKind` (cada categoria, override, desconhecida), `voxelize` (contagem de células, recuo de pixel claro, divisão em pé/deitado do PC real), `boxFaces` (mesa real `DESK_FRONT`, sofá, mesa de centro), `viewMode` (ler/gravar `'orbit'` e projeção, valor inválido volta ao padrão).
 - Checagem visual com Playwright no modo navegador (`npm run dev` + mensagens simuladas, como o script usado nas rotinas): Smiith Tech e template de 10 agentes, em Miniatura e Jogo, nos yaws 0°, 90°, 180°, 270°; clique em agente abre o painel; legenda acompanha; paredes da frente cortadas.
 - `npm run build` (tipos, lint, bundle) e suíte vitest completa sem regressão. E2E existente continua rodando (a Órbita não muda o fluxo padrão, que abre em 2D).
+
+## Decisões tomadas na implementação
+
+- O "recorte" (plano com sprite) usado por personagens, cadeiras e plantas fica num só lugar: `orbit/card.ts`.
+- `snapYaw` arredonda para o quarto de volta mais próximo (o teste do plano tinha um erro de digitação).
+- Itens de parede também procuram a parede na linha logo acima do footprint (layouts antigos colocam estantes no chão,
+  encostadas na parede).
+- Trocar Miniatura ↔ Jogo recria o canvas; alvo, yaw e pitch são restaurados do estado compartilhado da câmera.
+- Trocar de layout com a Órbita aberta: o limite da câmera é refeito; paredes e móveis são reconstruídos.
+- Q/E/R são ignorados com Ctrl/Cmd/Alt (não brigam com atalhos do VS Code).
+- Aceito como está: depois de zoom pela roda, os botões + − voltam aos passos inteiros do app.
+- Adiado: clique atravessa paredes; número de chamadas de desenho (~550) só será otimizado se o fps real ficar abaixo
+  de 60 em GPU real.

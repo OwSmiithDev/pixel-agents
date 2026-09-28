@@ -25,14 +25,62 @@
 | **Layout Smiith Tech**       | Escritório 40×30 com 18 estações: desenvolvimento (6), suporte / IA (6), operações / NOC (4, monitores duplos), atendimento e demos (2), sala de reunião e lounge com café. Um corredor grafite com trilhas de luz ciano liga todas as portas.                                                                                                                                                                                                                           |
 | **Overlay animado**          | O painel de status do agente (atividade, time, uso de contexto) acompanha o personagem também no 3D e entra com animação (Motion). Respeita `prefers-reduced-motion`.                                                                                                                                                                                                                                                                                                    |
 | **Órbita**                   | Terceiro modo do seletor (`2D \| 3D \| Órbita`). Câmera livre em volta do escritório, como num jogo: arraste para girar, botão direito para mover, roda para zoom, Q/E giram 90°, R volta. Paredes viram blocos que abaixam quando ficam na frente; mesas e sofás viram blocos; PCs, estantes, quadros, lixeira e café viram voxel (um cubo por pixel da arte). Chave **Miniatura** (ortográfica) / **Jogo** (perspectiva). Funciona com qualquer layout, sem conversão. |
-| **Carregamento sob demanda** | O 3D (~270 kB gzip) só é baixado quando você o abre. Quem fica no 2D não paga nada.                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Carregamento sob demanda** | O 3D e a Órbita (~285 kB gzip juntos) só são baixados quando você os abre. Quem fica no 2D não paga nada.                                                                                                                                                                                                                                                                                                                                                                |
 
-O 3D fica desabilitado enquanto o editor de layout ou o tour inicial estão abertos — ambos dependem da projeção 2D.
+O 3D e a Órbita ficam desabilitados enquanto o editor de layout ou o tour inicial estão abertos — ambos dependem da projeção 2D.
 
 <p align="center">
   <img src="docs/superpowers/specs/img/office-2d.png" alt="Mesmo escritório na visão 2D original" width="440">
   <img src="docs/superpowers/specs/img/office-3d-select.png" alt="Agente selecionado na visão 3D com painel de status" width="440">
 </p>
+
+## Órbita (câmera livre)
+
+Clique em **Órbita** no canto superior direito. Abaixo dele aparece a chave **Miniatura | Jogo**:
+
+- **Miniatura** — câmera ortográfica, visual de maquete.
+- **Jogo** — câmera em perspectiva, visual de jogo 3D.
+
+| Comando                         | O que faz                                     |
+| ------------------------------- | --------------------------------------------- |
+| Arrastar (botão esquerdo)       | Gira em volta do escritório                   |
+| Arrastar (botão direito / meio) | Move a câmera                                 |
+| Roda do mouse / botões + −      | Aproxima e afasta                             |
+| `Q` / `E`                       | Gira 90° para um lado ou para o outro         |
+| `R`                             | Volta ao ângulo inicial, centralizado         |
+| Clique num agente               | Seleciona (abre o painel); arrastar não conta |
+
+Ângulo, posição e tipo de câmera ficam salvos. Trocar Miniatura ↔ Jogo mantém o que você está vendo.
+
+**Como cada coisa vira 3D** — decidido pela categoria do móvel no catálogo, então **qualquer layout funciona sem
+conversão** (os que você criar no editor, importar ou gerar por script):
+
+| No layout                                                   | Na Órbita                                                                        |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Paredes                                                     | Blocos na cor da parede; abaixam sozinhos quando ficam entre a câmera e a sala   |
+| PCs e monitores (`electronics`)                             | Voxel (um cubinho por pixel); tela afundada, teclado deitado na mesa, tela pisca |
+| Itens de parede (estantes, quadros, quadro branco, relógio) | Voxel encostado na parede; somem junto quando a parede abaixa                    |
+| Objetos pequenos (`misc`: lixeira, café)                    | Voxel                                                                            |
+| Mesas (`desks`) e sofás                                     | Blocos com a arte no tampo e na frente, pés vazados                              |
+| Cadeiras                                                    | Recorte que mostra frente, costas ou lado conforme o ângulo                      |
+| Plantas e decoração                                         | Recorte em pé, virado para a câmera                                              |
+| Agentes e pets                                              | Mesmo sprite do 2D, com a direção certa vista da câmera                          |
+| Cores aplicadas no editor                                   | Mantidas                                                                         |
+
+Um móvel novo no catálogo cai sozinho na regra da categoria dele. Se algum ficar estranho, há uma tabela de exceções
+por tipo em `webview-ui/src/office/three/orbit/orbitKind.ts` (`ORBIT_KIND_OVERRIDES`).
+
+<p align="center">
+  <img src="docs/superpowers/specs/img/orbit-miniatura.png" alt="Órbita em Miniatura: escritório Smiith Tech com paredes cortadas, mesas em bloco e PCs em voxel" width="440">
+  <img src="docs/superpowers/specs/img/orbit-jogo.png" alt="Órbita em Jogo: mesmo escritório em perspectiva, vista de outro ângulo" width="440">
+</p>
+
+**Limites conhecidos**
+
+- A Órbita desenha bem mais objetos que o 3D (cerca de 550 chamadas de desenho por quadro no Smiith Tech). Em placa de
+  vídeo integrada muito fraca, prefira o 3D.
+- Clicar numa parede que está na frente de um agente ainda seleciona o agente.
+- Depois de girar a roda do mouse, os botões + − voltam à escala em passos inteiros do app (pode dar um pequeno pulo).
 
 ## Rotina dos agentes
 
@@ -115,6 +163,22 @@ Depois de instalar, feche e reabra o VS Code e aceite a instalação dos hooks n
 
 **No VS Code (desenvolvimento)** — abra esta pasta no VS Code e pressione **F5**.
 
+**Em outro PC / atualizar para a versão mais nova** — com o repositório já clonado:
+
+```bash
+cd pixel-agents
+git pull origin main
+npm install                                    # instala dependências novas, se houver
+npm run build
+npx @vscode/vsce package --no-dependencies
+code --install-extension pixel-agents-smiith-1.4.1.vsix --force
+```
+
+Feche e reabra o VS Code. No primeiro uso em cada PC, aceite a instalação dos hooks no painel.
+
+O `npm run build` mostra dois avisos que podem ser ignorados: um `react-hooks/exhaustive-deps` em `App.tsx` (antigo)
+e "Some chunks are larger than 500 kB" — é a biblioteca 3D (three.js), carregada só quando você abre o 3D ou a Órbita.
+
 ## Onde está cada coisa
 
 | Caminho                                            | O quê                                                                   |
@@ -156,15 +220,15 @@ VS Code pai (`ELECTRON_RUN_AS_NODE`, `VSCODE_*`), que antes impediam o VS Code d
 Este projeto é um fork de **[Pixel Agents](https://github.com/pixel-agents-hq/pixel-agents)**, criado e mantido por
 **[Pablo De Lucca](https://github.com/pablodelucca)** e contribuidores. Toda a base — extensão VS Code, servidor
 standalone, detecção de agentes por hooks, motor de personagens, editor de layout e arte pixel — é trabalho deles.
-Este fork adiciona por cima a visão 3D, o layout Smiith Tech, a rotina de trabalho/descanso dos agentes, os títulos
-de tarefa e o template de 10 agentes.
+Este fork adiciona por cima a visão 3D, a Órbita (câmera livre com blocos e voxel), o layout Smiith Tech, a rotina de
+trabalho/descanso dos agentes, os títulos de tarefa e o template de 10 agentes.
 
 - README original do projeto: [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md)
 - Apoie o autor original: [GitHub Sponsors](https://github.com/sponsors/pablodelucca) · [Ko-fi](https://ko-fi.com/pablodelucca)
 - Comunidade original: [Discord](https://discord.gg/Yk7jXebv9H) · [Discussions](https://github.com/pixel-agents-hq/pixel-agents/discussions)
 
 Bugs do núcleo do Pixel Agents devem ser reportados no [repositório original](https://github.com/pixel-agents-hq/pixel-agents/issues);
-problemas da visão 3D, das rotinas, dos títulos ou dos layouts Smiith, [aqui](https://github.com/OwSmiithDev/pixel-agents/issues).
+problemas da visão 3D, da Órbita, das rotinas, dos títulos ou dos layouts Smiith, [aqui](https://github.com/OwSmiithDev/pixel-agents/issues).
 
 ## Licença
 
