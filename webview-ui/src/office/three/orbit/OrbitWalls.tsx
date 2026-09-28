@@ -53,7 +53,13 @@ export function OrbitWalls({ officeState, viewRef, cutRef, reducedMotion }: Prop
   }, [walls]);
   const heights = useMemo(() => new Float32Array(walls.length).fill(ORBIT_WALL_HEIGHT), [walls]);
 
-  useEffect(() => () => mesh.material.dispose(), [mesh]);
+  useEffect(
+    () => () => {
+      mesh.dispose();
+      mesh.material.dispose();
+    },
+    [mesh],
+  );
 
   const m4 = useMemo(() => new THREE.Matrix4(), []);
   const pos = useMemo(() => new THREE.Vector3(), []);

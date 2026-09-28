@@ -28,7 +28,10 @@ import { perspDistance, snapYaw } from './orbitMath.js';
 
 export interface OrbitViewState {
   yaw: number;
+  polar: number;
   target: THREE.Vector3;
+  /** True once the rig has written a real frame — distinguishes "never set" from (0,0,0). */
+  ready: boolean;
 }
 export type OrbitPick = { kind: 'agent'; id: number } | { kind: 'pet'; id: string };
 
@@ -61,8 +64,12 @@ export function OrbitRig({
   const dpr = useThree((s) => s.viewport.dpr);
   const ortho = projection === 'ortho';
   const ground = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
+  // Layout size the boundary was last set for; re-checked every frame so a
+  // layout swap while Orbit is open (different cols/rows) updates the bound.
+  const boundaryRef = useRef<{ cols: number; rows: number } | null>(null);
 
-  // Initial framing: layout center, stored angles, bounded target.
+  // Initial framing: restore the previous camera across a projection remount
+  // (viewRef survives it), otherwise layout center + stored angles. Bounded target.
   useEffect(() => {
     const c = controls.current;
     if (!c) return;
@@ -70,17 +77,22 @@ export function OrbitRig({
     c.setBoundary(
       new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(layout.cols, 0, layout.rows)),
     );
-    c.setTarget(layout.cols / 2, 0, layout.rows / 2, false);
-    const saved = readStoredOrbitCamera();
-    c.rotateTo(saved.yaw, saved.polar, false);
+    boundaryRef.current = { cols: layout.cols, rows: layout.rows };
+    if (viewRef.current.ready) {
+      const t = viewRef.current.target;
+      c.setTarget(t.x, t.y, t.z, false);
+      c.rotateTo(viewRef.current.yaw, viewRef.current.polar, false);
+    } else {
+      c.setTarget(layout.cols / 2, 0, layout.rows / 2, false);
+      const saved = readStoredOrbitCamera();
+      c.rotateTo(saved.yaw, saved.polar, false);
+    }
     c.mouseButtons.left = ACTION.ROTATE;
     c.mouseButtons.right = ACTION.TRUCK;
     c.mouseButtons.middle = ACTION.TRUCK;
     c.mouseButtons.wheel = ortho ? ACTION.ZOOM : ACTION.DOLLY;
     c.touches.one = ACTION.TOUCH_ROTATE;
     c.touches.two = ortho ? ACTION.TOUCH_ZOOM_TRUCK : ACTION.TOUCH_DOLLY_TRUCK;
-    c.smoothTime = reducedMotion ? 0 : 0.2;
-    c.draggingSmoothTime = reducedMotion ? 0 : 0.1;
     // Persist the angle whenever the camera comes to rest.
     const onRest = () => storeOrbitCamera({ yaw: c.azimuthAngle, polar: c.polarAngle });
     const onStart = () => {
@@ -93,7 +105,17 @@ export function OrbitRig({
       c.removeEventListener('rest', onRest);
       c.removeEventListener('controlstart', onStart);
     };
-  }, [officeState, ortho, reducedMotion]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- viewRef is a stable ref, read once at mount.
+  }, [officeState, ortho]);
+
+  // Smoothing knobs live on their own effect so toggling reduced motion mid-session
+  // doesn't re-run the framing effect above and reset target/angles.
+  useEffect(() => {
+    const c = controls.current;
+    if (!c) return;
+    c.smoothTime = reducedMotion ? 0 : 0.2;
+    c.draggingSmoothTime = reducedMotion ? 0 : 0.1;
+  }, [reducedMotion]);
 
   // App zoom (ZoomControls +/−) drives the camera scale; limits follow ZOOM_MIN/MAX.
   useEffect(() => {
@@ -128,6 +150,7 @@ export function OrbitRig({
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
       const c = controls.current;
       if (!c) return;
       const k = e.key.toLowerCase();
@@ -211,6 +234,14 @@ export function OrbitRig({
     officeState.update(Math.min(delta, MAX_DELTA_TIME_SEC));
     const c = controls.current;
     if (!c) return;
+    const layout = officeState.getLayout();
+    const bounds = boundaryRef.current;
+    if (bounds && (bounds.cols !== layout.cols || bounds.rows !== layout.rows)) {
+      c.setBoundary(
+        new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(layout.cols, 0, layout.rows)),
+      );
+      boundaryRef.current = { cols: layout.cols, rows: layout.rows };
+    }
     const followCh =
       officeState.cameraFollowId !== null
         ? officeState.characters.get(officeState.cameraFollowId)
@@ -224,7 +255,9 @@ export function OrbitRig({
       tmp.set(tx, 0, tz);
     }
     viewRef.current.yaw = c.azimuthAngle;
+    viewRef.current.polar = c.polarAngle;
     viewRef.current.target.copy(tmp);
+    viewRef.current.ready = true;
   });
 
   return (

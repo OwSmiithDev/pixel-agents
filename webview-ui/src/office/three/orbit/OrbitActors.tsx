@@ -136,7 +136,10 @@ export function OrbitActors({ officeState, viewRef, pickablesRef }: Props) {
     }
 
     for (const pet of officeState.pets) {
-      const sprite = getPetSpriteData(pet, getPetSprites(pet.petType));
+      const sprite = getPetSpriteData(
+        { ...pet, dir: relativeDirection(pet.dir, yaw) },
+        getPetSprites(pet.petType),
+      );
       if (!sprite) continue;
       place(sprite, pet.x / TILE_SIZE, pet.y / TILE_SIZE, 0, { pick: { kind: 'pet', id: pet.id } });
     }

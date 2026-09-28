@@ -37,7 +37,12 @@ export function OrbitScene({
   projectorRef,
 }: OrbitSceneProps) {
   const reducedMotion = usePrefersReducedMotion();
-  const viewRef = useRef<OrbitViewState>({ yaw: 0, target: new THREE.Vector3() });
+  const viewRef = useRef<OrbitViewState>({
+    yaw: 0,
+    polar: 0,
+    target: new THREE.Vector3(),
+    ready: false,
+  });
   const pickablesRef = useRef<THREE.Object3D[]>([]);
   const cutRef = useRef(new Set<string>());
   const ortho = projection === 'ortho';
