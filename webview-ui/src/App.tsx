@@ -33,7 +33,14 @@ import { EditTool, type OfficeLayout } from './office/types.js';
 import { isBrowserRuntime, isE2E } from './runtime.js';
 import { installTestHooks } from './testHooks.js';
 import { transport } from './transport/index.js';
-import { readStoredViewMode, storeViewMode, type ViewMode } from './viewMode.js';
+import {
+  type OrbitProjection,
+  readStoredOrbitProjection,
+  readStoredViewMode,
+  storeOrbitProjection,
+  storeViewMode,
+  type ViewMode,
+} from './viewMode.js';
 
 // Game state lives outside React — updated imperatively by message handlers
 const officeStateRef = { current: null as OfficeState | null };
@@ -47,6 +54,9 @@ if (isE2E) installTestHooks(officeStateRef);
 // Three.js is only downloaded when the 3D view is first opened.
 const Office3D = lazy(() =>
   import('./office/three/Office3D.js').then((m) => ({ default: m.Office3D })),
+);
+const OrbitScene = lazy(() =>
+  import('./office/three/orbit/OrbitScene.js').then((m) => ({ default: m.OrbitScene })),
 );
 
 function getOfficeState(): OfficeState {
@@ -75,6 +85,12 @@ function App() {
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
     storeViewMode(mode);
+  }, []);
+  const [orbitProjection, setOrbitProjection] =
+    useState<OrbitProjection>(readStoredOrbitProjection);
+  const handleProjectionChange = useCallback((p: OrbitProjection) => {
+    setOrbitProjection(p);
+    storeOrbitProjection(p);
   }, []);
 
   const isEditDirty = useCallback(
@@ -349,11 +365,13 @@ function App() {
   // The layout editor and the intro tour are 2D-only (they hit-test and anchor
   // on the canvas projection), so 3D yields to them while they are open.
   const view3dLockedReason = editor.isEditMode
-    ? '3D is unavailable while editing the layout'
+    ? '3D and Orbit are unavailable while editing the layout'
     : intro
-      ? '3D is available after the intro'
+      ? '3D and Orbit are available after the intro'
       : null;
-  const show3d = viewMode === '3d' && view3dLockedReason === null;
+  const effectiveView: ViewMode = view3dLockedReason === null ? viewMode : '2d';
+  const show3d = effectiveView === '3d';
+  const showOrbit = effectiveView === 'orbit';
 
   if (!layoutReady) {
     return <div className="w-full h-full flex items-center justify-center ">Loading...</div>;
@@ -371,6 +389,20 @@ function App() {
             officeState={officeState}
             zoom={editor.zoom}
             onZoomChange={editor.handleZoomChange}
+            onAgentClick={handleClick}
+            projectorRef={projector3dRef}
+          />
+        </Suspense>
+      ) : showOrbit ? (
+        <Suspense
+          fallback={
+            <div className="w-full h-full flex items-center justify-center">Loading 3D…</div>
+          }
+        >
+          <OrbitScene
+            officeState={officeState}
+            zoom={editor.zoom}
+            projection={orbitProjection}
             onAgentClick={handleClick}
             projectorRef={projector3dRef}
           />
@@ -400,8 +432,10 @@ function App() {
         <>
           <ZoomControls zoom={editor.zoom} onZoomChange={editor.handleZoomChange} />
           <ViewToggle
-            mode={show3d ? '3d' : '2d'}
+            mode={effectiveView}
             onChange={handleViewModeChange}
+            projection={orbitProjection}
+            onProjectionChange={handleProjectionChange}
             lockedReason={view3dLockedReason}
           />
 
@@ -487,7 +521,7 @@ function App() {
             onCloseAgent={handleCloseAgent}
             alwaysShowOverlay={alwaysShowOverlay}
             anchorToScreen={
-              show3d
+              show3d || showOrbit
                 ? (x, groundY, lift) => projector3dRef.current?.(x, groundY, lift) ?? null
                 : undefined
             }

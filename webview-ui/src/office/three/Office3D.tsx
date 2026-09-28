@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
 import {
@@ -11,10 +11,6 @@ import {
   THREE_CAMERA_DISTANCE,
   THREE_CAMERA_PITCH_DEG,
   THREE_CAMERA_YAW_DEG,
-  THREE_KEY_LIGHT_COLOR,
-  THREE_KEY_LIGHT_INTENSITY,
-  THREE_KEY_LIGHT_OFFSET,
-  THREE_SHADOW_MAP_SIZE,
   ZOOM_MAX,
   ZOOM_MIN,
   ZOOM_SCROLL_THRESHOLD,
@@ -26,9 +22,11 @@ import { TILE_SIZE } from '../types.js';
 import { cameraBasis, PX_PER_UNIT } from './coords.js';
 import { Effects } from './Effects.js';
 import { FloorLayer } from './FloorLayer.js';
+import { KeyLight } from './KeyLight.js';
 import { MonitorLights } from './MonitorLights.js';
 import type { SpritePick } from './SpriteLayer.js';
 import { SpriteLayer } from './SpriteLayer.js';
+import { usePrefersReducedMotion } from './usePrefersReducedMotion.js';
 
 interface Office3DProps {
   officeState: OfficeState;
@@ -46,20 +44,6 @@ export type ScreenProjector = (
   groundY: number,
   liftPx: number,
 ) => { x: number; y: number } | null;
-
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(
-    () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    if (!mq) return;
-    const onChange = () => setReduced(mq.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return reduced;
-}
 
 interface RigProps {
   officeState: OfficeState;
@@ -115,44 +99,6 @@ function CameraRig({ officeState, zoom, target, forward, up, projectorRef }: Rig
     }
   });
   return null;
-}
-
-function KeyLight({ officeState }: { officeState: OfficeState }) {
-  const light = useRef<THREE.DirectionalLight>(null);
-  const layout = officeState.getLayout();
-  const cx = layout.cols / 2;
-  const cz = layout.rows / 2;
-  const half = Math.max(layout.cols, layout.rows) * 0.75;
-  useEffect(() => {
-    const l = light.current;
-    if (!l) return;
-    l.target.position.set(cx, 0, cz);
-    l.target.updateMatrixWorld();
-    const cam = l.shadow.camera;
-    cam.left = -half;
-    cam.right = half;
-    cam.top = half;
-    cam.bottom = -half;
-    cam.near = 1;
-    cam.far = 200;
-    cam.updateProjectionMatrix();
-  }, [cx, cz, half]);
-  return (
-    <directionalLight
-      ref={light}
-      color={THREE_KEY_LIGHT_COLOR}
-      intensity={THREE_KEY_LIGHT_INTENSITY * Math.PI}
-      position={[
-        cx + THREE_KEY_LIGHT_OFFSET.x,
-        THREE_KEY_LIGHT_OFFSET.y,
-        cz + THREE_KEY_LIGHT_OFFSET.z,
-      ]}
-      castShadow
-      shadow-mapSize-width={THREE_SHADOW_MAP_SIZE}
-      shadow-mapSize-height={THREE_SHADOW_MAP_SIZE}
-      shadow-bias={-0.0005}
-    />
-  );
 }
 
 /** Pointer picking (agents, pets, seats) + middle-drag pan, all on the r3f canvas. */
