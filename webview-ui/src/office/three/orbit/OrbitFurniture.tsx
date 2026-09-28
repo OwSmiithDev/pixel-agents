@@ -54,8 +54,17 @@ interface Built {
     facing: Direction;
     views: Partial<Record<string, { sprite: SpriteData; mirrored: boolean }>>;
   };
-  owned: Array<THREE.Material | THREE.Texture | THREE.BufferGeometry>;
+  /** Desk block height (tiles), re-registered in the height map while the block is unchanged. */
+  deskHeight?: number;
+  /** Instance placement the object was built for; any change rebuilds it. */
+  x: number;
+  y: number;
+  mirrored: boolean;
+  /** Materials, textures, geometries and instanced meshes (their GL buffers) this item owns. */
+  owned: Array<{ dispose(): void }>;
 }
+
+type BuiltCore = Omit<Built, 'x' | 'y' | 'mirrored'>;
 
 function cropTexture(
   sprite: SpriteData,
@@ -158,7 +167,13 @@ interface Props {
 export function OrbitFurniture({ officeState, viewRef, cutRef }: Props) {
   const group = useMemo(() => new THREE.Group(), []);
   const built = useMemo(() => new Map<string, Built>(), []);
-  const state = useMemo(() => ({ last: null as FurnitureInstance[] | null }), []);
+  const state = useMemo(
+    () => ({
+      last: null as FurnitureInstance[] | null,
+      tileMap: null as OfficeState['tileMap'] | null,
+    }),
+    [],
+  );
 
   const dispose = (b: Built) => {
     group.remove(b.object);
@@ -170,7 +185,7 @@ export function OrbitFurniture({ officeState, viewRef, cutRef }: Props) {
     inst: FurnitureInstance,
     kind: OrbitKind,
     deskTop: Map<string, number>,
-  ): Built | null => {
+  ): BuiltCore | null => {
     const entry = getCatalogEntry(inst.type!);
     if (!entry) return null;
     const sprite = inst.sprite;
@@ -212,9 +227,10 @@ export function OrbitFurniture({ officeState, viewRef, cutRef }: Props) {
       inner.add(mesh);
       holder.position.set(ox, 0, oz);
       owned.push(top, front, side, geo, ...mats);
-      if (entry.category === 'desks')
-        markDesk(inst, entry.footprintW, entry.footprintH, f.height, deskTop);
-      return { kind, sprite, object: holder, owned };
+      const deskHeight = entry.category === 'desks' ? f.height : undefined;
+      if (deskHeight !== undefined)
+        markDesk(inst, entry.footprintW, entry.footprintH, deskHeight, deskTop);
+      return { kind, sprite, object: holder, owned, deskHeight };
     }
 
     if (kind === 'voxel') {
@@ -227,7 +243,8 @@ export function OrbitFurniture({ officeState, viewRef, cutRef }: Props) {
       const model = voxelize(sprite, { depthPx, splitLying: electronics });
       const mesh = voxelMesh(model.cells);
       inner.add(mesh);
-      owned.push(mesh.material as THREE.Material);
+      // The mesh itself: InstancedMesh.dispose() frees its instance buffers (not UNIT_BOX).
+      owned.push(mesh, mesh.material as THREE.Material);
       let wallRow = -1;
       if (entry.canPlaceOnWalls) {
         // Also the row just above the footprint: an item placed on the floor tile in front of a
@@ -298,28 +315,29 @@ export function OrbitFurniture({ officeState, viewRef, cutRef }: Props) {
       const uid = inst.uid!;
       seen.add(uid);
       const prev = built.get(uid);
-      if (prev && prev.kind === kind && prev.sprite === inst.sprite) {
-        if (kind === 'box') {
-          // Unchanged block: keep the desk height map up to date.
+      const samePlace =
+        prev && prev.x === inst.x && prev.y === inst.y && prev.mirrored === Boolean(inst.mirrored);
+      if (samePlace && prev.kind === kind && prev.sprite === inst.sprite) {
+        // Unchanged: keep the desk height map up to date.
+        if (prev.deskHeight !== undefined) {
           const entry = getCatalogEntry(inst.type!)!;
-          const f = boxFaces(inst.sprite);
-          if (entry.category === 'desks' && f)
-            markDesk(inst, entry.footprintW, entry.footprintH, f.height, deskTop);
+          markDesk(inst, entry.footprintW, entry.footprintH, prev.deskHeight, deskTop);
         }
         continue;
       }
-      if (prev?.voxel && kind === 'voxel' && prev.voxel.mask === maskKey(inst.sprite)) {
+      if (samePlace && prev.voxel && kind === 'voxel' && prev.voxel.mask === maskKey(inst.sprite)) {
         // Same shape, new colors (PC screen frames, editor color): recolor in place.
         recolor(prev.voxel, inst.sprite);
         prev.sprite = inst.sprite;
         continue;
       }
       if (prev) dispose(prev);
-      const next = build(inst, kind, deskTop);
-      if (!next) {
+      const core = build(inst, kind, deskTop);
+      if (!core) {
         built.delete(uid);
         continue;
       }
+      const next: Built = { ...core, x: inst.x, y: inst.y, mirrored: Boolean(inst.mirrored) };
       built.set(uid, next);
       group.add(next.object);
     }
@@ -332,6 +350,13 @@ export function OrbitFurniture({ officeState, viewRef, cutRef }: Props) {
   };
 
   useFrame(() => {
+    if (officeState.tileMap !== state.tileMap) {
+      // New tile map (layout load/import): wall anchoring may change, so rebuild everything.
+      state.tileMap = officeState.tileMap;
+      built.forEach(dispose);
+      built.clear();
+      state.last = null;
+    }
     if (officeState.furniture !== state.last) {
       state.last = officeState.furniture;
       reconcile(officeState.furniture);
