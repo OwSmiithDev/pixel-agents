@@ -19,12 +19,13 @@
 
 ## O que este fork adiciona
 
-|                              |                                                                                                                                                                                                                                                |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Visão 3D**                 | Botão `2D \| 3D` no canto superior direito. Os mesmos sprites viram planos em uma cena Three.js com sombras reais, luz dos monitores e bloom. Clique, hover, troca de assento e câmera que segue o agente funcionam igual ao 2D.               |
-| **Layout Smiith Tech**       | Escritório 40×30 com 18 estações: desenvolvimento (6), suporte / IA (6), operações / NOC (4, monitores duplos), atendimento e demos (2), sala de reunião e lounge com café. Um corredor grafite com trilhas de luz ciano liga todas as portas. |
-| **Overlay animado**          | O painel de status do agente (atividade, time, uso de contexto) acompanha o personagem também no 3D e entra com animação (Motion). Respeita `prefers-reduced-motion`.                                                                          |
-| **Carregamento sob demanda** | O 3D (~270 kB gzip) só é baixado quando você o abre. Quem fica no 2D não paga nada.                                                                                                                                                            |
+|                              |                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Visão 3D**                 | Botão `2D \| 3D` no canto superior direito. Os mesmos sprites viram planos em uma cena Three.js com sombras reais, luz dos monitores e bloom. Clique, hover, troca de assento e câmera que segue o agente funcionam igual ao 2D.                                                                                                                                                                                                                                         |
+| **Layout Smiith Tech**       | Escritório 40×30 com 18 estações: desenvolvimento (6), suporte / IA (6), operações / NOC (4, monitores duplos), atendimento e demos (2), sala de reunião e lounge com café. Um corredor grafite com trilhas de luz ciano liga todas as portas.                                                                                                                                                                                                                           |
+| **Overlay animado**          | O painel de status do agente (atividade, time, uso de contexto) acompanha o personagem também no 3D e entra com animação (Motion). Respeita `prefers-reduced-motion`.                                                                                                                                                                                                                                                                                                    |
+| **Órbita**                   | Terceiro modo do seletor (`2D \| 3D \| Órbita`). Câmera livre em volta do escritório, como num jogo: arraste para girar, botão direito para mover, roda para zoom, Q/E giram 90°, R volta. Paredes viram blocos que abaixam quando ficam na frente; mesas e sofás viram blocos; PCs, estantes, quadros, lixeira e café viram voxel (um cubo por pixel da arte). Chave **Miniatura** (ortográfica) / **Jogo** (perspectiva). Funciona com qualquer layout, sem conversão. |
+| **Carregamento sob demanda** | O 3D (~270 kB gzip) só é baixado quando você o abre. Quem fica no 2D não paga nada.                                                                                                                                                                                                                                                                                                                                                                                      |
 
 O 3D fica desabilitado enquanto o editor de layout ou o tour inicial estão abertos — ambos dependem da projeção 2D.
 
@@ -116,20 +117,22 @@ Depois de instalar, feche e reabra o VS Code e aceite a instalação dos hooks n
 
 ## Onde está cada coisa
 
-| Caminho                                            | O quê                                                                 |
-| -------------------------------------------------- | --------------------------------------------------------------------- |
-| `webview-ui/src/office/three/`                     | Renderer 3D: câmera, chão, sprites, luzes, efeitos                    |
-| `webview-ui/src/office/three/coords.ts`            | Mapeamento sprite 2D → mundo 3D (mantém a mesma oclusão do 2D)        |
-| `webview-ui/src/office/engine/officeClick.ts`      | Lógica de clique compartilhada entre 2D e 3D                          |
-| `webview-ui/src/office/engine/officeState.ts`      | Assentos de trabalho/descanso, fila "fora do escritório", IDE/rótulos |
-| `webview-ui/src/office/engine/characters.ts`       | Máquina de estados dos personagens (trabalho, caminhada, descanso)    |
-| `webview-ui/src/office/components/ToolOverlay.tsx` | Legenda compacta/expandida sobre os agentes                           |
-| `server/src/taskTitle.ts`                          | Derivação do título da tarefa (tag › lista de tarefas › prompt)       |
-| `webview-ui/src/constants.ts`                      | Cores e parâmetros do 3D (`THREE_*`) — ângulo de câmera, luzes, bloom |
-| `scripts/layouts/smiith-tech.mjs`                  | Gerador do layout Smiith Tech (salas como retângulos)                 |
-| `webview-ui/public/assets/default-layout-2.json`   | Layout gerado, usado como padrão                                      |
-| `layouts/smiith-10-agentes.json`                   | Template de 10 agentes (Settings → Import Layout)                     |
-| `docs/superpowers/specs/`                          | Design e decisões técnicas                                            |
+| Caminho                                            | O quê                                                                   |
+| -------------------------------------------------- | ----------------------------------------------------------------------- |
+| `webview-ui/src/office/three/`                     | Renderer 3D: câmera, chão, sprites, luzes, efeitos                      |
+| `webview-ui/src/office/three/coords.ts`            | Mapeamento sprite 2D → mundo 3D (mantém a mesma oclusão do 2D)          |
+| `webview-ui/src/office/engine/officeClick.ts`      | Lógica de clique compartilhada entre 2D e 3D                            |
+| `webview-ui/src/office/engine/officeState.ts`      | Assentos de trabalho/descanso, fila "fora do escritório", IDE/rótulos   |
+| `webview-ui/src/office/engine/characters.ts`       | Máquina de estados dos personagens (trabalho, caminhada, descanso)      |
+| `webview-ui/src/office/components/ToolOverlay.tsx` | Legenda compacta/expandida sobre os agentes                             |
+| `server/src/taskTitle.ts`                          | Derivação do título da tarefa (tag › lista de tarefas › prompt)         |
+| `webview-ui/src/constants.ts`                      | Cores e parâmetros do 3D (`THREE_*`) — ângulo de câmera, luzes, bloom   |
+| `scripts/layouts/smiith-tech.mjs`                  | Gerador do layout Smiith Tech (salas como retângulos)                   |
+| `webview-ui/public/assets/default-layout-2.json`   | Layout gerado, usado como padrão                                        |
+| `layouts/smiith-10-agentes.json`                   | Template de 10 agentes (Settings → Import Layout)                       |
+| `docs/superpowers/specs/`                          | Design e decisões técnicas                                              |
+| `webview-ui/src/office/three/orbit/`               | Modo Órbita: câmera, paredes, móveis (bloco/voxel/recorte), personagens |
+| `webview-ui/src/office/three/orbit/orbitKind.ts`   | Regra de qual móvel vira bloco, voxel ou recorte (por categoria)        |
 
 Para ajustar o layout, edite o gerador e rode `node scripts/layouts/smiith-tech.mjs`.
 
