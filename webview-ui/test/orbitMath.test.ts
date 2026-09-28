@@ -35,7 +35,9 @@ describe('relativeDirection', () => {
 describe('snapYaw', () => {
   it('snaps to the nearest 90 degrees', () => {
     expect(snapYaw(0.9)).toBeCloseTo(Q);
-    expect(snapYaw(-0.7)).toBeCloseTo(-Q);
+    expect(snapYaw(-0.9)).toBeCloseTo(-Q);
+    expect(snapYaw(-0.7)).toBeCloseTo(0);
+    expect(snapYaw(0.1)).toBeCloseTo(0);
   });
 });
 

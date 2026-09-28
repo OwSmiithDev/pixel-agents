@@ -18,9 +18,7 @@ export function relativeDirection(worldDir: Direction, yaw: number): Direction {
 
 export function snapYaw(yaw: number, steps = 4): number {
   const step = (Math.PI * 2) / steps;
-  const quantized = yaw / step;
-  const sign = Math.sign(quantized) || 1;
-  return Math.ceil(Math.abs(quantized)) * sign * step;
+  return Math.round(yaw / step) * step;
 }
 
 /**
